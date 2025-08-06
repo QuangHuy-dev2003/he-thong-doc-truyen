@@ -13,7 +13,8 @@ import java.util.Set;
 @Entity
 @Table(name = "users")
 @Data
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = false, exclude = { "roles", "stories", "readingHistory", "favorites", "votes",
+        "storyComments", "chapterComments", "wallet", "userVip", "refreshToken" })
 @ToString(exclude = { "roles", "stories", "readingHistory", "favorites", "votes", "comments" })
 public class User {
 

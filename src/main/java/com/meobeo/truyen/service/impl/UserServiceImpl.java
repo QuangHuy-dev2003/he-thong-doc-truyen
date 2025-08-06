@@ -12,7 +12,6 @@ import com.meobeo.truyen.exception.AccountAlreadyActivatedException;
 import com.meobeo.truyen.mapper.UserMapper;
 import com.meobeo.truyen.repository.RoleRepository;
 import com.meobeo.truyen.repository.UserRepository;
-import com.meobeo.truyen.service.interfaces.EmailService;
 import com.meobeo.truyen.service.interfaces.OtpService;
 import com.meobeo.truyen.service.interfaces.UserService;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +33,6 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final OtpService otpService;
-    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -86,7 +86,10 @@ public class UserServiceImpl implements UserService {
         // Lấy role USER mặc định
         Role userRole = roleRepository.findByName("USER")
                 .orElseThrow(() -> new RuntimeException("Role USER không tồn tại"));
-        user.getRoles().add(userRole);
+
+        Set<Role> roles = new HashSet<>();
+        roles.add(userRole);
+        user.setRoles(roles);
 
         // Lưu user
         User savedUser = userRepository.save(user);

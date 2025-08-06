@@ -11,7 +11,7 @@ import java.util.Set;
 @Entity
 @Table(name = "roles")
 @Data
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = false, exclude = "users")
 @ToString(exclude = "users")
 public class Role {
 
