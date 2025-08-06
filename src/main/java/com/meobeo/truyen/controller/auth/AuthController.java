@@ -1,5 +1,7 @@
 package com.meobeo.truyen.controller.auth;
 
+import com.meobeo.truyen.domain.request.auth.OtpVerificationDto;
+import com.meobeo.truyen.domain.request.auth.ResendOtpDto;
 import com.meobeo.truyen.domain.request.auth.UserRegistrationDto;
 import com.meobeo.truyen.domain.response.auth.UserResponseDto;
 import com.meobeo.truyen.utils.ApiResponse;
@@ -27,7 +29,40 @@ public class AuthController {
         UserResponseDto userResponse = userService.registerUser(registrationDto);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Đăng ký tài khoản thành công", userResponse));
+                .body(ApiResponse.success("Đăng ký tài khoản thành công. Vui lòng kiểm tra email để xác thực OTP.",
+                        userResponse));
+    }
+
+    @PostMapping("/auth/verify-otp")
+    public ResponseEntity<ApiResponse<Boolean>> verifyOtp(
+            @Valid @RequestBody OtpVerificationDto otpVerificationDto) {
+        log.info("Nhận request xác thực OTP cho email: {}", otpVerificationDto.getEmail());
+
+        boolean isVerified = userService.verifyOtpAndActivateAccount(otpVerificationDto);
+
+        if (isVerified) {
+            return ResponseEntity
+                    .ok(ApiResponse.success("Xác thực OTP thành công. Tài khoản đã được kích hoạt.", true));
+        } else {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Mã OTP không hợp lệ hoặc đã hết hạn.", false));
+        }
+    }
+
+    @PostMapping("/auth/resend-otp")
+    public ResponseEntity<ApiResponse<String>> resendOtp(
+            @Valid @RequestBody ResendOtpDto resendOtpDto) {
+        log.info("Nhận request gửi lại OTP cho email: {}", resendOtpDto.getEmail());
+
+        try {
+            userService.resendOtp(resendOtpDto);
+            return ResponseEntity
+                    .ok(ApiResponse.success("Đã gửi lại mã OTP thành công. Vui lòng kiểm tra email.", "OTP sent"));
+        } catch (Exception e) {
+            log.error("Lỗi gửi lại OTP: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Không thể gửi lại mã OTP. " + e.getMessage(), null));
+        }
     }
 
     @GetMapping("/auth/check-username/{username}")

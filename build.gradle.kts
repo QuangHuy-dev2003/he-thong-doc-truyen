@@ -33,7 +33,7 @@ dependencies {
 	implementation("io.github.cdimascio:java-dotenv:5.2.2")
 	implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 	implementation("org.mapstruct:mapstruct:1.6.3")
-	
+	implementation("com.sendgrid:sendgrid-java:4.10.1")
 	annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")
 	compileOnly("org.projectlombok:lombok")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
