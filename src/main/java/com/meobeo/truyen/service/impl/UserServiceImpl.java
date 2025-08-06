@@ -20,11 +20,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
@@ -35,6 +35,7 @@ public class UserServiceImpl implements UserService {
     private final EmailService emailService;
 
     @Override
+    @Transactional
     public UserResponseDto registerUser(UserRegistrationDto registrationDto) {
         log.info("Bắt đầu đăng ký user với username: {}", registrationDto.getUsername());
 
@@ -49,6 +50,33 @@ public class UserServiceImpl implements UserService {
         }
 
         // Tạo user mới với isActive = false
+        User user = createUser(registrationDto);
+
+        // Debug log để kiểm tra user data
+        log.info("User đã tạo - ID: {}, Username: {}, Email: {}, CreatedAt: {}",
+                user.getId(), user.getUsername(), user.getEmail(), user.getCreatedAt());
+
+        // Tạo và gửi OTP (bất đồng bộ, không ảnh hưởng transaction)
+        try {
+            otpService.createAndSendOtp(user.getEmail(), user.getId());
+            log.info("Đã khởi tạo quá trình gửi OTP cho user: {}", user.getUsername());
+        } catch (Exception e) {
+            log.error("Lỗi khởi tạo OTP cho user {}: {}", user.getUsername(), e.getMessage());
+            // Không throw exception vì user đã được tạo thành công
+        }
+
+        UserResponseDto userResponse = userMapper.toUserResponseDto(user);
+
+        // Debug log để kiểm tra response data
+        log.info("UserResponse - ID: {}, Username: {}, Email: {}, Role: {}, CreatedAt: {}",
+                userResponse.getId(), userResponse.getUsername(), userResponse.getEmail(),
+                userResponse.getRole(), userResponse.getCreatedAt());
+
+        return userResponse;
+    }
+
+    @Transactional
+    protected User createUser(UserRegistrationDto registrationDto) {
         User user = new User();
         user.setUsername(registrationDto.getUsername());
         user.setEmail(registrationDto.getEmail());
@@ -64,18 +92,7 @@ public class UserServiceImpl implements UserService {
         User savedUser = userRepository.save(user);
         log.info("Đăng ký user thành công với ID: {}", savedUser.getId());
 
-        // Tạo và gửi OTP
-        try {
-            otpService.createAndSendOtp(savedUser.getEmail(), savedUser.getId());
-            log.info("Đã gửi OTP cho user: {}", savedUser.getUsername());
-        } catch (Exception e) {
-            log.error("Lỗi gửi OTP cho user {}: {}", savedUser.getUsername(), e.getMessage());
-            // Không throw exception để user vẫn được tạo, chỉ log lỗi
-        }
-
-        UserResponseDto userResponse = userMapper.toUserResponseDto(savedUser);
-        userResponse.setRole("USER"); // Set role mặc định
-        return userResponse;
+        return savedUser;
     }
 
     @Override
@@ -107,6 +124,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void resendOtp(ResendOtpDto resendOtpDto) {
         log.info("Gửi lại OTP cho email: {}", resendOtpDto.getEmail());
 

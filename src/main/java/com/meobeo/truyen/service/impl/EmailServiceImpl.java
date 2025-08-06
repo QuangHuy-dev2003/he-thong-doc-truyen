@@ -28,9 +28,12 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendOtpEmail(String toEmail, String otpCode) {
+        log.info("Bắt đầu gửi email OTP đến: {}", toEmail);
+
         try {
             Mail mail = new Mail();
-            mail.setFrom(new Email("noreply@meobeo.com", "Tiệm Truyện Mèo Béo"));
+            mail.setFrom(new Email("noreply.meobeo@gmail.com", "Tiệm Truyện Mèo Béo"));
+            mail.setSubject("Mã xác thực OTP của bạn từ Tiệm Truyện Mèo Béo");
             mail.setTemplateId(otpTemplateId);
 
             Personalization personalization = new Personalization();
@@ -49,13 +52,20 @@ public class EmailServiceImpl implements EmailService {
             if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
                 log.info("Gửi email OTP thành công đến: {}", toEmail);
             } else {
-                log.error("Lỗi gửi email OTP đến {}: {}", toEmail, response.getBody());
-                throw new RuntimeException("Không thể gửi email OTP");
+                String errorMessage = String.format("SendGrid API trả về lỗi. Status: %d, Body: %s",
+                        response.getStatusCode(), response.getBody());
+                log.error("Lỗi gửi email OTP đến {}: {}", toEmail, errorMessage);
+                throw new RuntimeException(errorMessage);
             }
 
         } catch (IOException e) {
-            log.error("Lỗi gửi email OTP đến {}: {}", toEmail, e.getMessage());
-            throw new RuntimeException("Không thể gửi email OTP", e);
+            String errorMessage = String.format("Lỗi kết nối SendGrid: %s", e.getMessage());
+            log.error("Lỗi gửi email OTP đến {}: {}", toEmail, errorMessage);
+            throw new RuntimeException(errorMessage, e);
+        } catch (Exception e) {
+            String errorMessage = String.format("Lỗi không xác định khi gửi email: %s", e.getMessage());
+            log.error("Lỗi gửi email OTP đến {}: {}", toEmail, errorMessage);
+            throw new RuntimeException(errorMessage, e);
         }
     }
 

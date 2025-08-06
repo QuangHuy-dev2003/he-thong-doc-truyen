@@ -2,12 +2,13 @@ package com.meobeo.truyen.service.impl;
 
 import com.meobeo.truyen.domain.entity.EmailOtp;
 import com.meobeo.truyen.repository.EmailOtpRepository;
-import com.meobeo.truyen.service.interfaces.EmailService;
+import com.meobeo.truyen.service.interfaces.AsyncEmailService;
 import com.meobeo.truyen.service.interfaces.OtpService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -16,11 +17,10 @@ import java.util.Random;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class OtpServiceImpl implements OtpService {
 
     private final EmailOtpRepository emailOtpRepository;
-    private final EmailService emailService;
+    private final AsyncEmailService asyncEmailService;
     private final Random random = new Random();
 
     @Override
@@ -31,12 +31,22 @@ public class OtpServiceImpl implements OtpService {
     }
 
     @Override
+    @Transactional
     public void createAndSendOtp(String email, Long userId) {
         log.info("Tạo và gửi OTP cho user ID: {} với email: {}", userId, email);
 
-        // Xóa các OTP cũ chưa sử dụng của user này
-        List<EmailOtp> oldOtps = emailOtpRepository.findValidOtpsByUserId(userId, LocalDateTime.now());
-        emailOtpRepository.deleteAll(oldOtps);
+        // Tạo OTP trong database
+        EmailOtp emailOtp = createOtpInDatabase(email, userId);
+
+        // Gửi email OTP bất đồng bộ
+        asyncEmailService.sendOtpEmailAsync(email, emailOtp.getOtpCode());
+    }
+
+    @Transactional
+    protected EmailOtp createOtpInDatabase(String email, Long userId) {
+        // Xóa các OTP cũ chưa sử dụng của email này
+        emailOtpRepository.deleteUnusedOtpsByEmail(email);
+        log.info("Đã xóa các OTP cũ cho email: {}", email);
 
         // Tạo OTP mới
         String otpCode = generateOtp();
@@ -49,16 +59,10 @@ public class OtpServiceImpl implements OtpService {
         emailOtp.setExpiresAt(expiresAt);
         emailOtp.setIsUsed(false);
 
-        emailOtpRepository.save(emailOtp);
+        EmailOtp savedOtp = emailOtpRepository.save(emailOtp);
+        log.info("Đã tạo OTP trong database cho user ID: {}", userId);
 
-        // Gửi email OTP
-        try {
-            emailService.sendOtpEmail(email, otpCode);
-            log.info("Đã gửi OTP thành công cho user ID: {}", userId);
-        } catch (Exception e) {
-            log.error("Lỗi gửi OTP cho user ID {}: {}", userId, e.getMessage());
-            throw new RuntimeException("Không thể gửi email OTP", e);
-        }
+        return savedOtp;
     }
 
     @Override
