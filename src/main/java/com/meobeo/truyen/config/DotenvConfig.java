@@ -30,10 +30,9 @@ public class DotenvConfig {
     @PostConstruct
     public void loadDotenv() {
         try {
-            Dotenv dotenv = dotenv();
+
             // Log để kiểm tra xem file .env có được load thành công không
-            System.out.println(" File .env loaded successfully");
-            System.out.println(" Environment variables loaded: " + dotenv.entries().size());
+            System.out.println(" File .env loading...");
         } catch (Exception e) {
             System.err.println(" Warning: Could not load .env file: " + e.getMessage());
             System.err.println(" Make sure .env file exists in project root directory");

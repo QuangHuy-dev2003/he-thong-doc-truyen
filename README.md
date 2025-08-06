@@ -52,7 +52,7 @@
 
 ### Clone và cấu hình
 
-git clone https://github.com/your-username/tiem-truyen-meo-beo.git
+git clone https://github.com/QuangHuy-dev2003/he-thong-doc-truyen
 
 ### Tạo file .env
 

@@ -30,7 +30,7 @@ public class Chapter {
     @Column(name = "title")
     private String title;
 
-    @Column(name = "content", columnDefinition = "LONGTEXT")
+    @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
     @CreationTimestamp
