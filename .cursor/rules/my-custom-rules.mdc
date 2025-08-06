@@ -1,0 +1,143 @@
+---
+description: "Quy tắc phát triển dự án Web Đọc Truyện Tiệm Truyện Mèo Béo"
+globs:
+  - "**/*.java"
+  - "**/*.kt"
+  - "**/*.md"
+alwaysApply: true
+---
+
+# CURSOR INSTRUCTION – WEB ĐỌC TRUYỆN
+
+## 🔁 Ngôn ngữ mặc định:
+
+- Tất cả câu trả lời, hướng dẫn, code và giải thích đều **bằng tiếng Việt**.
+- Nếu người dùng dùng tiếng Anh hoặc yêu cầu xuất code tiếng Anh thì mới chuyển.
+
+---
+
+## 🧾 Khi yêu cầu có nội dung dài:
+
+- **Không trả lời 1 cục dài**.
+- Phân tích yêu cầu thành **TODO list cụ thể**, ví dụ:
+  - Bước 1: Thiết kế API
+  - Bước 2: Viết controller
+  - Bước 3: Tạo entity và service
+- Mỗi bước trả lời riêng, **giữ tiến độ rõ ràng**, tránh nhảy cóc.
+
+---
+
+## 🛠️ Đối với Java Spring Boot:
+
+- **KHÔNG sử dụng `@Autowired` field injection.**
+  - ✅ Dùng constructor injection cho mọi service, repository.
+- Ưu tiên **`@Service`, `@Repository`, `@Component` rõ ràng**, không nhồi logic vào controller.
+- Tuân thủ mô hình **Clean Architecture** hoặc **Layered Architecture**:
+  - `Controller` → `Service` → `Repository`
+- Mỗi controller/service không nên dài quá 300 dòng.
+- Không hard-code string như role hay status: nên dùng `enum` hoặc `constant`.
+
+---
+
+## 🧹 Code sạch và maintainable:
+
+- Format code chuẩn theo Java conventions (CamelCase, PascalCase…).
+- Không dùng biến đặt tên `a`, `b`, `temp` – tất cả biến phải có ý nghĩa.
+- Comment khi cần, KHÔNG comment thừa.
+- Nếu có đoạn code phức tạp → giải thích rõ trong comment hoặc docstring.
+- Ưu tiên viết code **đọc được dễ hơn là viết ngắn**.
+
+---
+
+## 📊 JPA – Query – Index:
+
+- Khi làm việc với các bảng lớn như `chapters`, `stories`, `reading_history`, `chapter_unlocks`…:
+  - ✅ Luôn xác định rõ truy vấn chính để tạo **index phù hợp** trong MySQL.
+- Nếu dùng JPA filter như:
+  - Lọc chương theo `story_slug`, `chapter_number` → dùng composite index `(story_id, chapter_number)`
+  - Kiểm tra unlock chương → index `(user_id, chapter_id)`
+  - Lấy truyện theo `slug` → index `slug` UNIQUE
+- Với truy vấn phức tạp, đừng lạm dụng `findBy…` mà dùng `@Query` hoặc `QueryDSL` để:
+  - JOIN chính xác
+  - FETCH để tránh lazy loading chậm
+- Nếu phân trang → bắt buộc dùng `Pageable`
+- Nếu cần tìm kiếm nâng cao (keyword, tag, tác giả,…) → index FULLTEXT hoặc ElasticSearch (nếu mở rộng)
+
+## 🚀 Performance:
+
+- Khi xử lý nhiều dữ liệu:
+  - ✅ Dùng `JOIN` thay vì query từng bảng.
+  - ✅ Sử dụng `@Query` với `JOIN FETCH` nếu cần tránh lazy loading quá nhiều.
+- Với API có phân trang: Luôn sử dụng `Pageable`, trả kết quả có:
+  - `content`
+  - `page`
+  - `totalPages`
+  - `totalElements`
+- Với các bảng lớn: Chỉ lấy những field cần thiết → nên tạo DTO riêng.
+
+---
+
+## 🧠 Trí tuệ và tự động hóa:
+
+- Khi người dùng cung cấp yêu cầu phức tạp:
+  - Phân tích mục tiêu và chia thành các phần rõ ràng.
+  - Gợi ý nếu có giải pháp tối ưu hơn.
+- Luôn đặt câu hỏi ngược nếu yêu cầu không rõ.
+
+---
+
+## 💡 Tips xử lý truyện:
+
+- Với các bảng như `stories`, `chapters`, `reading_history`:
+  - Dùng index thông minh (composite key, slug, chapter_number…).
+- Dùng Redis cache để giảm tải khi lấy truyện hot, đề cử nhiều.
+- Luôn log lại hành động nạp tiền, đề cử, đọc truyện… để audit.
+
+---
+
+## 🎯 Đảm bảo chuyên nghiệp:
+
+- Mọi code đều phải:
+  - Có unit test nếu phức tạp.
+  - Có exception handling rõ ràng (`@ControllerAdvice` nếu có thể).
+  - Gắn log cho các thao tác quan trọng (login, thanh toán, unlock…).
+- Khi query custom:
+  - Nên dùng `JPQL` hoặc `@Query`, không viết lỏm bỏm trong code.
+- Luôn suy nghĩ về khả năng **scaling**, phân quyền, và bảo trì lâu dài.
+
+---
+
+## 📦 Tích hợp:
+
+- Nếu dùng Redis, JWT, Paypal… thì cần config rõ, comment cụ thể từng đoạn.
+- Luôn tạo `application.yaml` mẫu để dễ setup môi trường.
+
+---
+
+## 🧷 Quản lý Role:
+
+- 3 loại tài khoản:
+  - `ADMIN`: Quản trị, duyệt truyện, người dùng
+  - `UPLOADER`: Người đăng truyện
+  - `USER`: Người đọc truyện bình thường
+
+---
+
+## 📜 Phản hồi người dùng:
+
+- Khi trả lời user:
+  - Luôn giữ thái độ thân thiện, thẳng thắn.
+  - Không nịnh bợ.
+  - Nếu có lỗi, gợi ý sửa rõ ràng.
+
+---
+
+## Không tạo file README để hướng dẫn sử dụng
+
+- Không tự động tạo file README.md để hướng dẫn sử dụng.
+- Và không tự tạo những file không liên quan về ví dụ sử dụng hay gì.
+- Không sử dụng Emoji trong mã nguồn trừ khi có yêu cầu.
+
+## Yêu cầu viết Commit
+
+- Trả về người dùng commit bằng tiếng anh và chuẩn cấu trúc sao cho gọn đúng yêu cầu và thống nhất.
