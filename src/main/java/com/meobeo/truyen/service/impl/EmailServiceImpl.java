@@ -33,12 +33,13 @@ public class EmailServiceImpl implements EmailService {
         try {
             Mail mail = new Mail();
             mail.setFrom(new Email("noreply.meobeo@gmail.com", "Tiệm Truyện Mèo Béo"));
+
             mail.setTemplateId(otpTemplateId);
 
             Personalization personalization = new Personalization();
             personalization.addTo(new Email(toEmail));
             personalization.addDynamicTemplateData("otpCode", otpCode);
-            personalization.addDynamicTemplateData("subject", "Mã xác thực OTP của bạn từ Tiệm Truyện Mèo Béo");
+
             mail.addPersonalization(personalization);
 
             Request request = new Request();

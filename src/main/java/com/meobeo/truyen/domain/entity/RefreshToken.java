@@ -18,7 +18,7 @@ public class RefreshToken {
     @Column(name = "user_id")
     private Long userId;
 
-    @Column(name = "token", columnDefinition = "TEXT")
+    @Column(name = "token", columnDefinition = "TEXT", unique = true)
     private String token;
 
     @Column(name = "expiry_date")
