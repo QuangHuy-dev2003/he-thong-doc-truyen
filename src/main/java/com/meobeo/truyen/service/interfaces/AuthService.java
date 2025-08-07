@@ -21,4 +21,9 @@ public interface AuthService {
      * Đăng xuất user
      */
     void logout(Long userId);
+
+    /**
+     * Đăng nhập bằng Google OAuth2 (redirect flow)
+     */
+    LoginResponseDto loginWithGoogleUserInfo(String email, String displayName, String avatarUrl);
 }
