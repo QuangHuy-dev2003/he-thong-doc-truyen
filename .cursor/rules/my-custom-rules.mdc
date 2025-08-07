@@ -45,6 +45,7 @@ alwaysApply: true
 - Không dùng biến đặt tên `a`, `b`, `temp` – tất cả biến phải có ý nghĩa.
 - Comment khi cần, KHÔNG comment thừa.
 - Nếu có đoạn code phức tạp → giải thích rõ trong comment hoặc docstring.
+- Ở controller comment để biết API dùng để làm gì .
 - Ưu tiên viết code **đọc được dễ hơn là viết ngắn**.
 
 ---

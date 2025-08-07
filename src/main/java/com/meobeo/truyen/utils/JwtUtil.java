@@ -120,7 +120,14 @@ public class JwtUtil {
      * Tạo signing key từ secret
      */
     private SecretKey getSigningKey() {
-        byte[] keyBytes = jwtConfig.getSecret().getBytes();
+        String secret = jwtConfig.getSecret();
+        log.debug("JWT Secret length: {}", secret != null ? secret.length() : "null");
+        if (secret == null || secret.trim().isEmpty()) {
+            log.error("JWT Secret is null or empty!");
+            throw new IllegalStateException("JWT Secret is not configured properly");
+        }
+        byte[] keyBytes = secret.getBytes();
+        log.debug("Key bytes length: {}", keyBytes.length);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }

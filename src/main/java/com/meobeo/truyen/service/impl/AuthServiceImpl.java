@@ -22,8 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.stream.Collectors;
+
+import java.security.SecureRandom;
+import com.meobeo.truyen.domain.enums.AuthProvider;
+import com.meobeo.truyen.exception.GoogleOAuth2Exception;
 
 @Service
 @RequiredArgsConstructor
@@ -138,6 +140,68 @@ public class AuthServiceImpl implements AuthService {
 
         // Xóa refresh token của user
         refreshTokenRepository.deleteByUserId(userId);
+    }
+
+    @Override
+    @Transactional
+    public LoginResponseDto loginWithGoogleUserInfo(String email, String displayName, String avatarUrl) {
+        try {
+            // Kiểm tra user theo email
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                // Tạo password random (mã hoá)
+                String randomPassword = generateRandomPassword(16);
+                String encodedPassword = passwordEncoder.encode(randomPassword);
+                user = new User();
+                user.setEmail(email);
+                user.setUsername(email); // Google không có username, dùng email
+                user.setDisplayName(displayName);
+                user.setAvatarUrl(avatarUrl);
+                user.setPassword(encodedPassword);
+                user.setIsActive(true);
+                user.setProvider(AuthProvider.GOOGLE);
+                user = userRepository.save(user);
+            } else {
+                if (user.getProvider() == AuthProvider.BASIC) {
+                    throw new GoogleOAuth2Exception(
+                            "Tài khoản này đã đăng ký truyền thống, vui lòng đăng nhập bằng form.");
+                }
+                // Nếu là GOOGLE thì cho đăng nhập bình thường
+            }
+
+            // Lấy role đầu tiên
+            String role = user.getRoles().stream()
+                    .findFirst()
+                    .map(roleEntity -> roleEntity.getName())
+                    .orElse("USER");
+
+            // Sinh JWT token
+            String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername(), role);
+            String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername(), role);
+            saveRefreshToken(user.getId(), refreshToken);
+            UserResponseDto userResponse = userMapper.toUserResponseDto(user);
+            return LoginResponseDto.builder()
+                    .user(userResponse)
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .expiresIn(jwtConfig.getAccessToken().getExpiration())
+                    .build();
+        } catch (GoogleOAuth2Exception e) {
+            throw e;
+        } catch (Exception e) {
+            throw new GoogleOAuth2Exception("Đăng nhập Google thất bại: " + e.getMessage(), e);
+        }
+    }
+
+    private String generateRandomPassword(int length) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 
     /**

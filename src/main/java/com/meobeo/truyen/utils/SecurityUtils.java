@@ -1,5 +1,6 @@
 package com.meobeo.truyen.utils;
 
+import com.meobeo.truyen.security.CustomUserDetails;
 import com.meobeo.truyen.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -20,8 +21,9 @@ public class SecurityUtils {
      */
     public Optional<String> getCurrentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            return Optional.of(authentication.getName());
+        if (authentication != null && authentication.isAuthenticated() &&
+                authentication.getPrincipal() instanceof CustomUserDetails) {
+            return Optional.of(((CustomUserDetails) authentication.getPrincipal()).getUsername());
         }
         return Optional.empty();
     }
@@ -30,9 +32,24 @@ public class SecurityUtils {
      * Lấy userId từ SecurityContext
      */
     public Optional<Long> getCurrentUserId() {
-        return getCurrentUsername()
-                .flatMap(username -> userRepository.findByUsername(username))
-                .map(user -> user.getId());
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() &&
+                authentication.getPrincipal() instanceof CustomUserDetails) {
+            return Optional.of(((CustomUserDetails) authentication.getPrincipal()).getUserId());
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Lấy CustomUserDetails từ SecurityContext
+     */
+    public Optional<CustomUserDetails> getCurrentUserDetails() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() &&
+                authentication.getPrincipal() instanceof CustomUserDetails) {
+            return Optional.of((CustomUserDetails) authentication.getPrincipal());
+        }
+        return Optional.empty();
     }
 
     /**
@@ -59,5 +76,45 @@ public class SecurityUtils {
                     .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
         }
         return false;
+    }
+
+    /**
+     * Kiểm tra user hiện tại có bất kỳ role nào trong danh sách
+     */
+    public boolean hasAnyRole(String... roles) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getAuthorities().stream()
+                    .anyMatch(authority -> {
+                        for (String role : roles) {
+                            if (authority.getAuthority().equals("ROLE_" + role)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+        }
+        return false;
+    }
+
+    /**
+     * Kiểm tra user hiện tại có phải là ADMIN không
+     */
+    public boolean isAdmin() {
+        return hasRole("ADMIN");
+    }
+
+    /**
+     * Kiểm tra user hiện tại có phải là UPLOADER không
+     */
+    public boolean isUploader() {
+        return hasRole("UPLOADER");
+    }
+
+    /**
+     * Kiểm tra user hiện tại có phải là USER không
+     */
+    public boolean isUser() {
+        return hasRole("USER");
     }
 }

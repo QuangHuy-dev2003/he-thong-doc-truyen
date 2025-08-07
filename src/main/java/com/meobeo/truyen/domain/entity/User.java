@@ -1,5 +1,6 @@
 package com.meobeo.truyen.domain.entity;
 
+import com.meobeo.truyen.domain.enums.AuthProvider;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -15,7 +16,8 @@ import java.util.Set;
 @Data
 @EqualsAndHashCode(callSuper = false, exclude = { "roles", "stories", "readingHistory", "favorites", "votes",
         "storyComments", "chapterComments", "wallet", "userVip", "refreshToken" })
-@ToString(exclude = { "roles", "stories", "readingHistory", "favorites", "votes", "comments" })
+@ToString(exclude = { "roles", "stories", "readingHistory", "favorites", "votes", "storyComments", "chapterComments",
+        "wallet", "userVip", "refreshToken" })
 public class User {
 
     @Id
@@ -42,6 +44,10 @@ public class User {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider")
+    private AuthProvider provider = AuthProvider.BASIC;
 
     @CreationTimestamp
     @Column(name = "created_at")
