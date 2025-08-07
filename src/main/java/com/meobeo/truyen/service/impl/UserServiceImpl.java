@@ -1,7 +1,9 @@
 package com.meobeo.truyen.service.impl;
 
+import com.meobeo.truyen.domain.request.auth.ForgotPasswordDto;
 import com.meobeo.truyen.domain.request.auth.OtpVerificationDto;
 import com.meobeo.truyen.domain.request.auth.ResendOtpDto;
+import com.meobeo.truyen.domain.request.auth.ResetPasswordDto;
 import com.meobeo.truyen.domain.request.auth.UserRegistrationDto;
 import com.meobeo.truyen.domain.response.auth.UserResponseDto;
 import com.meobeo.truyen.domain.entity.Role;
@@ -9,6 +11,8 @@ import com.meobeo.truyen.domain.entity.User;
 import com.meobeo.truyen.exception.UserAlreadyExistsException;
 import com.meobeo.truyen.exception.InvalidOtpException;
 import com.meobeo.truyen.exception.AccountAlreadyActivatedException;
+import com.meobeo.truyen.exception.UserNotFoundException;
+import com.meobeo.truyen.exception.AccountNotActivatedException;
 import com.meobeo.truyen.mapper.UserMapper;
 import com.meobeo.truyen.repository.RoleRepository;
 import com.meobeo.truyen.repository.UserRepository;
@@ -154,5 +158,61 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
+    }
+
+    @Override
+    @Transactional
+    public void sendForgotPasswordOtp(ForgotPasswordDto forgotPasswordDto) {
+        log.info("Gửi OTP quên mật khẩu cho email: {}", forgotPasswordDto.getEmail());
+
+        // Tìm user theo email
+        User user = userRepository.findByEmail(forgotPasswordDto.getEmail())
+                .orElseThrow(() -> new UserNotFoundException(
+                        "Không tìm thấy tài khoản với email: " + forgotPasswordDto.getEmail()));
+
+        // Kiểm tra tài khoản đã được kích hoạt
+        if (!user.getIsActive()) {
+            throw new AccountNotActivatedException(
+                    "Tài khoản chưa được kích hoạt. Vui lòng kích hoạt tài khoản trước.");
+        }
+
+        // Tạo và gửi OTP quên mật khẩu
+        otpService.createAndSendForgotPasswordOtp(user.getEmail(), user.getId());
+        log.info("Đã gửi OTP quên mật khẩu cho user: {}", user.getUsername());
+    }
+
+    @Override
+    @Transactional
+    public boolean resetPassword(ResetPasswordDto resetPasswordDto) {
+        log.info("Đặt lại mật khẩu cho email: {}", resetPasswordDto.getEmail());
+
+        // Xác thực OTP
+        boolean isValidOtp = otpService.verifyOtp(resetPasswordDto.getEmail(), resetPasswordDto.getOtpCode());
+
+        if (!isValidOtp) {
+            log.warn("OTP không hợp lệ cho email: {}", resetPasswordDto.getEmail());
+            return false;
+        }
+
+        // Tìm user theo email
+        User user = userRepository.findByEmail(resetPasswordDto.getEmail())
+                .orElseThrow(() -> new UserNotFoundException(
+                        "Không tìm thấy user với email: " + resetPasswordDto.getEmail()));
+
+        // Kiểm tra tài khoản đã được kích hoạt
+        if (!user.getIsActive()) {
+            throw new AccountNotActivatedException(
+                    "Tài khoản chưa được kích hoạt. Vui lòng kích hoạt tài khoản trước.");
+        }
+
+        // Cập nhật mật khẩu mới
+        user.setPassword(passwordEncoder.encode(resetPasswordDto.getNewPassword()));
+        userRepository.save(user);
+
+        // Đánh dấu OTP đã sử dụng
+        otpService.markOtpAsUsed(resetPasswordDto.getEmail(), resetPasswordDto.getOtpCode());
+
+        log.info("Đặt lại mật khẩu thành công cho user: {}", user.getUsername());
+        return true;
     }
 }

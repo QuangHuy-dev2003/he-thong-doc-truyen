@@ -25,4 +25,16 @@ public class AsyncEmailServiceImpl implements AsyncEmailService {
             // Không throw exception vì đây là async method
         }
     }
+
+    @Override
+    @Async("taskExecutor")
+    public void sendForgotPasswordEmailAsync(String email, String otpCode) {
+        try {
+            emailService.sendForgotPasswordEmail(email, otpCode);
+            log.info("Gửi email quên mật khẩu bất đồng bộ thành công đến: {}", email);
+        } catch (Exception e) {
+            log.error("Lỗi gửi email quên mật khẩu bất đồng bộ đến {}: {}", email, e.getMessage());
+            // Không throw exception vì đây là async method
+        }
+    }
 }

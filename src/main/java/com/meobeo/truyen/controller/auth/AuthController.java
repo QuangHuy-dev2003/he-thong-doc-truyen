@@ -1,9 +1,11 @@
 package com.meobeo.truyen.controller.auth;
 
+import com.meobeo.truyen.domain.request.auth.ForgotPasswordDto;
 import com.meobeo.truyen.domain.request.auth.LoginRequestDto;
 import com.meobeo.truyen.domain.request.auth.OtpVerificationDto;
 import com.meobeo.truyen.domain.request.auth.RefreshTokenRequestDto;
 import com.meobeo.truyen.domain.request.auth.ResendOtpDto;
+import com.meobeo.truyen.domain.request.auth.ResetPasswordDto;
 import com.meobeo.truyen.domain.request.auth.UserRegistrationDto;
 import com.meobeo.truyen.domain.response.auth.LoginResponseDto;
 import com.meobeo.truyen.domain.response.auth.RefreshTokenResponseDto;
@@ -144,5 +146,37 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công", "Logged out"));
+    }
+
+    @PostMapping("/auth/forgot-password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordDto forgotPasswordDto) {
+        log.info("Nhận request quên mật khẩu cho email: {}", forgotPasswordDto.getEmail());
+
+        try {
+            userService.sendForgotPasswordOtp(forgotPasswordDto);
+            return ResponseEntity
+                    .ok(ApiResponse.success("Đã gửi mã OTP đặt lại mật khẩu. Vui lòng kiểm tra email.", "OTP sent"));
+        } catch (Exception e) {
+            log.error("Lỗi gửi OTP quên mật khẩu: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Không thể gửi mã OTP. " + e.getMessage(), null));
+        }
+    }
+
+    @PostMapping("/auth/reset-password")
+    public ResponseEntity<ApiResponse<Boolean>> resetPassword(
+            @Valid @RequestBody ResetPasswordDto resetPasswordDto) {
+        log.info("Nhận request đặt lại mật khẩu cho email: {}", resetPasswordDto.getEmail());
+
+        boolean isReset = userService.resetPassword(resetPasswordDto);
+
+        if (isReset) {
+            return ResponseEntity
+                    .ok(ApiResponse.success("Đặt lại mật khẩu thành công.", true));
+        } else {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Mã OTP không hợp lệ hoặc đã hết hạn.", false));
+        }
     }
 }

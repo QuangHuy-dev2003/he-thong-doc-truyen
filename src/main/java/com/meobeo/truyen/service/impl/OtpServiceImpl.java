@@ -42,11 +42,20 @@ public class OtpServiceImpl implements OtpService {
         asyncEmailService.sendOtpEmailAsync(email, emailOtp.getOtpCode());
     }
 
+    @Override
+    @Transactional
+    public void createAndSendForgotPasswordOtp(String email, Long userId) {
+        log.info("Tạo và gửi OTP quên mật khẩu cho user ID: {} với email: {}", userId, email);
+
+        // Tạo OTP trong database
+        EmailOtp emailOtp = createOtpInDatabase(email, userId);
+
+        // Gửi email quên mật khẩu bất đồng bộ
+        asyncEmailService.sendForgotPasswordEmailAsync(email, emailOtp.getOtpCode());
+    }
+
     @Transactional
     protected EmailOtp createOtpInDatabase(String email, Long userId) {
-        // Xóa các OTP cũ chưa sử dụng của email này
-        emailOtpRepository.deleteUnusedOtpsByEmail(email);
-        log.info("Đã xóa các OTP cũ cho email: {}", email);
 
         // Tạo OTP mới
         String otpCode = generateOtp();
