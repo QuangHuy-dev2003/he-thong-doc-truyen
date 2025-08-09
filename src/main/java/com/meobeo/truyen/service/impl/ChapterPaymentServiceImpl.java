@@ -4,6 +4,7 @@ import com.meobeo.truyen.domain.entity.Chapter;
 import com.meobeo.truyen.domain.entity.ChapterPayment;
 import com.meobeo.truyen.domain.request.chapter.ChapterLockRequest;
 import com.meobeo.truyen.domain.response.chapter.ChapterPaymentResponse;
+import com.meobeo.truyen.exception.BadRequestException;
 import com.meobeo.truyen.exception.ForbiddenException;
 import com.meobeo.truyen.exception.ResourceNotFoundException;
 import com.meobeo.truyen.repository.ChapterPaymentRepository;
@@ -42,19 +43,33 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
         Chapter chapter = chapterRepository.findByIdWithStory(chapterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chapter với ID: " + chapterId));
 
-        // Tạo hoặc cập nhật payment setting
-        ChapterPayment chapterPayment = chapterPaymentRepository.findByChapterId(chapterId)
-                .orElse(new ChapterPayment());
+        // Kiểm tra chapter đã bị khóa chưa
+        boolean exists = chapterPaymentRepository.existsByChapterId(chapterId);
+        log.info("CHECK: existsByChapterId({}) = {}", chapterId, exists);
 
-        chapterPayment.setChapterId(chapterId);
-        chapterPayment.setStoryId(chapter.getStory().getId());
-        chapterPayment.setPrice(request.getPrice());
-        chapterPayment.setIsVipOnly(request.getIsVipOnly() != null ? request.getIsVipOnly() : false);
-        chapterPayment.setIsLocked(true);
-        chapterPayment.setChapter(chapter);
-        chapterPayment.setStory(chapter.getStory());
+        if (exists) {
+            log.error("Chapter {} đã bị khóa rồi!", chapterId);
+            throw new BadRequestException("Chapter đã bị khóa rồi");
+        }
 
-        ChapterPayment savedPayment = chapterPaymentRepository.save(chapterPayment);
+        log.info("Chapter {} chưa bị khóa, tiến hành tạo record mới", chapterId);
+
+        // Tạo record khóa chapter mới bằng native query để tránh @MapsId conflict
+        int insertedRows = chapterPaymentRepository.insertChapterPayment(
+                chapterId,
+                chapter.getStory().getId(),
+                request.getPrice(),
+                request.getIsVipOnly() != null ? request.getIsVipOnly() : false,
+                true // isLocked = true
+        );
+
+        if (insertedRows == 0) {
+            throw new RuntimeException("Không thể tạo payment setting cho chapter: " + chapterId);
+        }
+
+        // Lấy lại entity sau khi insert để trả về response
+        ChapterPayment savedPayment = chapterPaymentRepository.findByChapterId(chapterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy payment setting vừa tạo"));
 
         log.info("Đã khóa chapter thành công: chapterId={}, price={}", chapterId, request.getPrice());
 

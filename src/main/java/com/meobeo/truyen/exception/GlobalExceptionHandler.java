@@ -141,6 +141,16 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Generic handler cho BadRequestException - dùng được cho mọi message tùy ý
+     */
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiResponse<String>> handleBadRequestException(BadRequestException ex) {
+        log.warn("BadRequestException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    /**
      * Handle RuntimeException với message về user authentication
      * Xử lý trường hợp user chưa đăng nhập khi gọi API yêu cầu authentication
      */

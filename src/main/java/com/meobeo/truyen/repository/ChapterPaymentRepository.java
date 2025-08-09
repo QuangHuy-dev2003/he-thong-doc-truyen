@@ -2,6 +2,7 @@ package com.meobeo.truyen.repository;
 
 import com.meobeo.truyen.domain.entity.ChapterPayment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -57,4 +58,27 @@ public interface ChapterPaymentRepository extends JpaRepository<ChapterPayment, 
      * Kiểm tra xem có payment setting cho chapter hay chưa
      */
     boolean existsByChapterId(Long chapterId);
+
+    /**
+     * Update payment setting trực tiếp bằng query để tránh OptimisticLocking
+     */
+    @Modifying
+    @Query("UPDATE ChapterPayment cp SET cp.price = :price, cp.isVipOnly = :isVipOnly, cp.isLocked = :isLocked " +
+            "WHERE cp.chapterId = :chapterId")
+    int updateChapterPayment(@Param("chapterId") Long chapterId,
+            @Param("price") Integer price,
+            @Param("isVipOnly") Boolean isVipOnly,
+            @Param("isLocked") Boolean isLocked);
+
+    /**
+     * Insert payment setting mới bằng native query để tránh @MapsId conflict
+     */
+    @Modifying
+    @Query(value = "INSERT INTO chapter_payments (chapter_id, story_id, price, is_vip_only, is_locked) " +
+            "VALUES (:chapterId, :storyId, :price, :isVipOnly, :isLocked)", nativeQuery = true)
+    int insertChapterPayment(@Param("chapterId") Long chapterId,
+            @Param("storyId") Long storyId,
+            @Param("price") Integer price,
+            @Param("isVipOnly") Boolean isVipOnly,
+            @Param("isLocked") Boolean isLocked);
 }
