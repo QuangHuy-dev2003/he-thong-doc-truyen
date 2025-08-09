@@ -47,8 +47,7 @@ public class ChapterController {
         // Set storyId từ URL vào request (ưu tiên URL over request body)
         request.setStoryId(storyId);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
 
         ChapterResponse chapter = chapterService.createChapter(request, userId);
 
@@ -69,8 +68,7 @@ public class ChapterController {
 
         log.info("API cập nhật chapter được gọi: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
 
         ChapterResponse chapter = chapterService.updateChapterByStoryAndNumber(storyId, chapterNumber, request, userId);
 
@@ -89,8 +87,7 @@ public class ChapterController {
 
         log.info("API xóa chapter được gọi: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
 
         chapterService.deleteChapterByStoryAndNumber(storyId, chapterNumber, userId);
 
@@ -236,8 +233,7 @@ public class ChapterController {
 
         log.info("API kiểm tra quyền chỉnh sửa chapter được gọi: chapterId={}", chapterId);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
         boolean canEdit = chapterService.canEditChapter(chapterId, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Kiểm tra quyền chỉnh sửa thành công", canEdit));
@@ -258,8 +254,7 @@ public class ChapterController {
 
         log.info("API tạo comment được gọi: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
 
         CommentResponse comment = chapterCommentService.createComment(storyId, chapterNumber, request, userId);
 
@@ -315,15 +310,15 @@ public class ChapterController {
     /**
      * DELETE /api/v1/comments/{commentId} - Xóa comment
      * Chỉ ADMIN hoặc người tạo comment được phép xóa
+     * Yêu cầu đăng nhập (được xử lý bởi
+     * SecurityConfig.anyRequest().authenticated())
      */
     @DeleteMapping("/comments/{commentId}")
-    @PreAuthorize("hasRole('USER') or hasRole('UPLOADER') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteComment(@PathVariable Long commentId) {
 
         log.info("API xóa comment được gọi: commentId={}", commentId);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
 
         chapterCommentService.deleteComment(commentId, userId);
 

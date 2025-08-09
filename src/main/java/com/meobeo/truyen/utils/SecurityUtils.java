@@ -1,7 +1,7 @@
 package com.meobeo.truyen.utils;
 
 import com.meobeo.truyen.security.CustomUserDetails;
-import com.meobeo.truyen.repository.UserRepository;
+import com.meobeo.truyen.exception.UnauthenticatedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,7 +13,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SecurityUtils {
 
-    private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
     /**
@@ -116,5 +115,32 @@ public class SecurityUtils {
      */
     public boolean isUser() {
         return hasRole("USER");
+    }
+
+    /**
+     * Lấy userId từ SecurityContext - Throw exception nếu chưa đăng nhập
+     * Sử dụng phương thức này khi API bắt buộc phải có authentication
+     */
+    public Long getCurrentUserIdOrThrow() {
+        return getCurrentUserId()
+                .orElseThrow(() -> new UnauthenticatedException("Bạn cần đăng nhập để thực hiện thao tác này"));
+    }
+
+    /**
+     * Lấy username từ SecurityContext - Throw exception nếu chưa đăng nhập
+     * Sử dụng phương thức này khi API bắt buộc phải có authentication
+     */
+    public String getCurrentUsernameOrThrow() {
+        return getCurrentUsername()
+                .orElseThrow(() -> new UnauthenticatedException("Bạn cần đăng nhập để thực hiện thao tác này"));
+    }
+
+    /**
+     * Lấy CustomUserDetails từ SecurityContext - Throw exception nếu chưa đăng nhập
+     * Sử dụng phương thức này khi API bắt buộc phải có authentication
+     */
+    public CustomUserDetails getCurrentUserDetailsOrThrow() {
+        return getCurrentUserDetails()
+                .orElseThrow(() -> new UnauthenticatedException("Bạn cần đăng nhập để thực hiện thao tác này"));
     }
 }

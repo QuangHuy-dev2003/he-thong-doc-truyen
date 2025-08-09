@@ -9,7 +9,7 @@ import com.meobeo.truyen.domain.response.story.StoryListResponse;
 import com.meobeo.truyen.domain.response.story.StoryResponse;
 import com.meobeo.truyen.service.interfaces.StoryService;
 import com.meobeo.truyen.utils.SecurityUtils;
-import jakarta.validation.Valid;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -62,8 +62,7 @@ public class StoryController {
         request.setGenreIds(parsedGenreIds);
         request.setCoverImage(coverImage);
 
-        Long authorId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long authorId = securityUtils.getCurrentUserIdOrThrow();
         StoryResponse story = storyService.createStory(request, authorId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -100,8 +99,7 @@ public class StoryController {
         request.setGenreIds(parsedGenreIds);
         request.setCoverImage(coverImage);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
         StoryResponse story = storyService.updateStory(id, request, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Cập nhật truyện thành công", story));
@@ -116,8 +114,7 @@ public class StoryController {
 
         log.info("API xóa truyện được gọi: storyId={}", id);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
         storyService.deleteStory(id, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Xóa truyện thành công", null));
@@ -209,8 +206,7 @@ public class StoryController {
 
         log.info("API kiểm tra quyền chỉnh sửa được gọi: storyId={}", storyId);
 
-        Long userId = securityUtils.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
         boolean canEdit = storyService.canEditStory(storyId, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Kiểm tra quyền chỉnh sửa thành công", canEdit));

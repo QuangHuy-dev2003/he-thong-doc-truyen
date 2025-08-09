@@ -49,13 +49,6 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Dữ liệu không hợp lệ", errors));
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<String>> handleGenericException(Exception ex) {
-        log.error("Unexpected error occurred: {}", ex.getMessage(), ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."));
-    }
-
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiResponse<String>> handleInvalidCredentialsException(InvalidCredentialsException ex) {
         log.warn("InvalidCredentialsException: {}", ex.getMessage());
@@ -138,6 +131,42 @@ public class GlobalExceptionHandler {
         log.warn("AuthenticationException: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error("Token không hợp lệ hoặc đã hết hạn"));
+    }
+
+    @ExceptionHandler(UnauthenticatedException.class)
+    public ResponseEntity<ApiResponse<String>> handleUnauthenticatedException(UnauthenticatedException ex) {
+        log.warn("UnauthenticatedException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    /**
+     * Handle RuntimeException với message về user authentication
+     * Xử lý trường hợp user chưa đăng nhập khi gọi API yêu cầu authentication
+     */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiResponse<String>> handleRuntimeException(RuntimeException ex) {
+        // Kiểm tra nếu là lỗi liên quan đến không thể lấy thông tin user
+        if (ex.getMessage() != null && ex.getMessage().contains("Không thể lấy thông tin user")) {
+            log.warn("User authentication error: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Bạn cần đăng nhập để thực hiện thao tác này"));
+        }
+
+        // Các RuntimeException khác vẫn trả về 500
+        log.error("RuntimeException: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."));
+    }
+
+    /**
+     * Handler tổng quát cho tất cả Exception khác (phải đặt cuối cùng)
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<String>> handleGenericException(Exception ex) {
+        log.error("Unexpected error occurred: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."));
     }
 
 }
