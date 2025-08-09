@@ -2,9 +2,13 @@ package com.meobeo.truyen.controller.chapter;
 
 import com.meobeo.truyen.domain.request.chapter.CreateChapterRequest;
 import com.meobeo.truyen.domain.request.chapter.UpdateChapterRequest;
+import com.meobeo.truyen.domain.request.comment.CreateCommentRequest;
 import com.meobeo.truyen.domain.response.chapter.ChapterResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterListResponse;
+import com.meobeo.truyen.domain.response.comment.CommentResponse;
+import com.meobeo.truyen.domain.response.comment.CommentListResponse;
 import com.meobeo.truyen.service.interfaces.ChapterService;
+import com.meobeo.truyen.service.interfaces.ChapterCommentService;
 import com.meobeo.truyen.utils.ApiResponse;
 import com.meobeo.truyen.utils.SecurityUtils;
 import jakarta.validation.Valid;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class ChapterController {
 
     private final ChapterService chapterService;
+    private final ChapterCommentService chapterCommentService;
     private final SecurityUtils securityUtils;
 
     /**
@@ -236,6 +241,107 @@ public class ChapterController {
         boolean canEdit = chapterService.canEditChapter(chapterId, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Kiểm tra quyền chỉnh sửa thành công", canEdit));
+    }
+
+    // ========================== COMMENT APIs ==========================
+
+    /**
+     * POST /api/v1/stories/{storyId}/chapters/{chapterNumber}/comments - Tạo
+     * comment cho chapter
+     * Yêu cầu đăng nhập (USER, UPLOADER, ADMIN)
+     */
+    @PostMapping("/stories/{storyId}/chapters/{chapterNumber}/comments")
+    public ResponseEntity<ApiResponse<CommentResponse>> createComment(
+            @PathVariable Long storyId,
+            @PathVariable Integer chapterNumber,
+            @Valid @RequestBody CreateCommentRequest request) {
+
+        log.info("API tạo comment được gọi: storyId={}, chapterNumber={}", storyId, chapterNumber);
+
+        Long userId = securityUtils.getCurrentUserId()
+                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+
+        CommentResponse comment = chapterCommentService.createComment(storyId, chapterNumber, request, userId);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Tạo comment thành công", comment));
+    }
+
+    /**
+     * GET /api/v1/stories/{storyId}/chapters/{chapterNumber}/comments - Lấy danh
+     * sách comment của chapter (Public)
+     */
+    @GetMapping("/stories/{storyId}/chapters/{chapterNumber}/comments")
+    public ResponseEntity<ApiResponse<CommentListResponse>> getChapterComments(
+            @PathVariable Long storyId,
+            @PathVariable Integer chapterNumber,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.info("API lấy comment chapter được gọi: storyId={}, chapterNumber={}, page={}, size={}",
+                storyId, chapterNumber, page, size);
+
+        // Validation page parameters
+        validatePageParameters(page, size);
+
+        Pageable pageable = PageRequest.of(page, size);
+        CommentListResponse comments = chapterCommentService.getCommentsByStoryAndChapter(storyId, chapterNumber,
+                pageable);
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách comment thành công", comments));
+    }
+
+    /**
+     * GET /api/v1/chapters/{chapterId}/comments - Lấy danh sách comment theo
+     * chapterId (Public, fallback)
+     */
+    @GetMapping("/chapters/{chapterId}/comments")
+    public ResponseEntity<ApiResponse<CommentListResponse>> getChapterCommentsByChapterId(
+            @PathVariable Long chapterId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.info("API lấy comment theo chapterId được gọi: chapterId={}, page={}, size={}", chapterId, page, size);
+
+        // Validation page parameters
+        validatePageParameters(page, size);
+
+        Pageable pageable = PageRequest.of(page, size);
+        CommentListResponse comments = chapterCommentService.getCommentsByChapter(chapterId, pageable);
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách comment thành công", comments));
+    }
+
+    /**
+     * DELETE /api/v1/comments/{commentId} - Xóa comment
+     * Chỉ ADMIN hoặc người tạo comment được phép xóa
+     */
+    @DeleteMapping("/comments/{commentId}")
+    @PreAuthorize("hasRole('USER') or hasRole('UPLOADER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteComment(@PathVariable Long commentId) {
+
+        log.info("API xóa comment được gọi: commentId={}", commentId);
+
+        Long userId = securityUtils.getCurrentUserId()
+                .orElseThrow(() -> new RuntimeException("Không thể lấy thông tin user"));
+
+        chapterCommentService.deleteComment(commentId, userId);
+
+        return ResponseEntity.ok(ApiResponse.success("Xóa comment thành công", null));
+    }
+
+    /**
+     * GET /api/v1/chapters/{chapterId}/comments/count - Đếm số comment của chapter
+     * (Public)
+     */
+    @GetMapping("/chapters/{chapterId}/comments/count")
+    public ResponseEntity<ApiResponse<Long>> countChapterComments(@PathVariable Long chapterId) {
+
+        log.info("API đếm comment chapter được gọi: chapterId={}", chapterId);
+
+        Long totalComments = chapterCommentService.countCommentsByChapter(chapterId);
+
+        return ResponseEntity.ok(ApiResponse.success("Đếm comment thành công", totalComments));
     }
 
     // Helper methods for validation

@@ -26,6 +26,10 @@ public class ChapterComment {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "story_id", nullable = false)
+    private Story story;
+
     // Quan hệ với Chapter - Many-to-One
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "chapter_id")

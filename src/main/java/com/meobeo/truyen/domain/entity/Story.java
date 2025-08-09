@@ -14,8 +14,8 @@ import java.util.Set;
 @Entity
 @Table(name = "stories")
 @Data
-@EqualsAndHashCode(exclude = { "genres", "chapters", "favorites", "votes", "comments" })
-@ToString(exclude = { "genres", "chapters", "favorites", "votes", "comments" })
+@EqualsAndHashCode(exclude = { "genres", "chapters", "favorites", "votes", "comments", "chapterComments" })
+@ToString(exclude = { "genres", "chapters", "favorites", "votes", "comments", "chapterComments" })
 public class Story {
 
     @Id
@@ -70,4 +70,7 @@ public class Story {
     // Quan hệ với StoryComment - One-to-Many
     @OneToMany(mappedBy = "story", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private Set<StoryComment> comments = new HashSet<>();
+
+    @OneToMany(mappedBy = "story", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private Set<ChapterComment> chapterComments = new HashSet<>();
 }
