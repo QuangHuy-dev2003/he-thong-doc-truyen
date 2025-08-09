@@ -1,6 +1,8 @@
 package com.meobeo.truyen.service.interfaces;
 
+import com.meobeo.truyen.domain.request.chapter.ChapterBatchLockRequest;
 import com.meobeo.truyen.domain.request.chapter.ChapterLockRequest;
+import com.meobeo.truyen.domain.response.chapter.ChapterBatchLockResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterPaymentResponse;
 
 import java.util.List;
@@ -55,4 +57,10 @@ public interface ChapterPaymentService {
      * Xóa payment setting của chapter (để chapter trở thành miễn phí)
      */
     void removeChapterPayment(Long chapterId, Long userId);
+
+    /**
+     * Khóa nhiều chapter cùng lúc (batch lock)
+     * Hỗ trợ khóa 1 chapter cụ thể hoặc khóa theo range chapter number
+     */
+    ChapterBatchLockResponse lockChaptersBatch(ChapterBatchLockRequest request, Long userId);
 }

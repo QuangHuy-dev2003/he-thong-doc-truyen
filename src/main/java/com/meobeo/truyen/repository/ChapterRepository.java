@@ -94,4 +94,12 @@ public interface ChapterRepository extends JpaRepository<Chapter, Long> {
         @Query("SELECT c FROM Chapter c JOIN FETCH c.story WHERE c.story.id = :storyId AND c.chapterNumber = :chapterNumber")
         Optional<Chapter> findByStoryIdAndChapterNumber(@Param("storyId") Long storyId,
                         @Param("chapterNumber") Integer chapterNumber);
+
+        /**
+         * Lấy danh sách chapter theo range chapter number
+         */
+        @Query("SELECT c FROM Chapter c WHERE c.story.id = :storyId AND c.chapterNumber BETWEEN :chapterStart AND :chapterEnd ORDER BY c.chapterNumber ASC")
+        List<Chapter> findByStoryIdAndChapterNumberBetweenOrderByChapterNumber(@Param("storyId") Long storyId,
+                        @Param("chapterStart") Integer chapterStart,
+                        @Param("chapterEnd") Integer chapterEnd);
 }

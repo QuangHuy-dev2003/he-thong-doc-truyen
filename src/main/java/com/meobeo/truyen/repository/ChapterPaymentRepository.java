@@ -81,4 +81,10 @@ public interface ChapterPaymentRepository extends JpaRepository<ChapterPayment, 
             @Param("price") Integer price,
             @Param("isVipOnly") Boolean isVipOnly,
             @Param("isLocked") Boolean isLocked);
+
+    /**
+     * Lấy danh sách chapterIds đã bị khóa trong batch để tối ưu việc check
+     */
+    @Query("SELECT cp.chapterId FROM ChapterPayment cp WHERE cp.chapterId IN :chapterIds")
+    List<Long> findLockedChapterIds(@Param("chapterIds") List<Long> chapterIds);
 }

@@ -2,8 +2,12 @@ package com.meobeo.truyen.service.impl;
 
 import com.meobeo.truyen.domain.entity.Chapter;
 import com.meobeo.truyen.domain.entity.ChapterPayment;
+import com.meobeo.truyen.domain.entity.Story;
+import com.meobeo.truyen.domain.request.chapter.ChapterBatchLockRequest;
 import com.meobeo.truyen.domain.request.chapter.ChapterLockRequest;
+import com.meobeo.truyen.domain.response.chapter.ChapterBatchLockResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterPaymentResponse;
+
 import com.meobeo.truyen.exception.BadRequestException;
 import com.meobeo.truyen.exception.ForbiddenException;
 import com.meobeo.truyen.exception.ResourceNotFoundException;
@@ -17,7 +21,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -218,6 +225,124 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
             chapterPaymentRepository.delete(payment);
             log.info("Đã xóa payment setting cho chapter: {}", chapterId);
         });
+    }
+
+    @Override
+    @Transactional
+    public ChapterBatchLockResponse lockChaptersBatch(ChapterBatchLockRequest request, Long userId) {
+        log.info("Khóa batch chapter: storyId={}, userId={}", request.getStoryId(), userId);
+
+        // Validation request
+        if (!request.isValid()) {
+            throw new BadRequestException("Request không hợp lệ. Phải có chapterId hoặc (chapterStart + chapterEnd)");
+        }
+
+        // Kiểm tra quyền quản lý story
+        if (!canManageStory(request.getStoryId(), userId)) {
+            throw new ForbiddenException("Bạn không có quyền khóa chapter của story này");
+        }
+
+        // Lấy thông tin story
+        Story story = storyRepository.findById(request.getStoryId())
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy story với ID: " + request.getStoryId()));
+
+        List<Chapter> chaptersToLock = new ArrayList<>();
+
+        if (request.isSingleChapter()) {
+            // Khóa 1 chapter cụ thể
+            Chapter chapter = chapterRepository.findByIdWithStory(request.getChapterId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy chapter với ID: " + request.getChapterId()));
+
+            // Kiểm tra chapter có thuộc story không
+            if (!chapter.getStory().getId().equals(request.getStoryId())) {
+                throw new BadRequestException("Chapter không thuộc story được chỉ định");
+            }
+
+            chaptersToLock.add(chapter);
+        } else if (request.isRangeChapter()) {
+            // Khóa range chapter từ chapterStart đến chapterEnd
+            chaptersToLock = getChaptersByRange(request.getStoryId(), request.getChapterStart(),
+                    request.getChapterEnd());
+
+            if (chaptersToLock.isEmpty()) {
+                throw new ResourceNotFoundException("Không tìm thấy chapter nào trong khoảng " +
+                        request.getChapterStart() + " - " + request.getChapterEnd());
+            }
+        }
+
+        // Tối ưu: Check batch tất cả chapter đã khóa trước
+        List<Long> chapterIds = chaptersToLock.stream().map(Chapter::getId).collect(Collectors.toList());
+        Set<Long> lockedChapterIds = chapterPaymentRepository.findLockedChapterIds(chapterIds)
+                .stream().collect(Collectors.toSet());
+
+        List<ChapterPaymentResponse> successfulLocks = new ArrayList<>();
+        List<ChapterBatchLockResponse.ChapterLockFailure> failures = new ArrayList<>();
+
+        for (Chapter chapter : chaptersToLock) {
+            try {
+                // Bỏ qua chapter đã khóa
+                if (lockedChapterIds.contains(chapter.getId())) {
+                    log.debug("Bỏ qua chapter đã khóa: chapterId={}, chapterNumber={}",
+                            chapter.getId(), chapter.getChapterNumber());
+                    continue;
+                }
+
+                // Tạo record khóa chapter
+                int insertedRows = chapterPaymentRepository.insertChapterPayment(
+                        chapter.getId(),
+                        story.getId(),
+                        request.getPrice(),
+                        request.getIsVipOnly() != null ? request.getIsVipOnly() : false,
+                        true);
+
+                if (insertedRows > 0) {
+                    // Lấy lại entity sau khi insert bằng method có sẵn
+                    ChapterPayment savedPayment = chapterPaymentRepository.findByChapterIdWithDetails(chapter.getId())
+                            .orElseThrow(() -> new BadRequestException("Không thể lấy thông tin payment sau khi tạo"));
+
+                    successfulLocks.add(mapToResponse(savedPayment));
+                    log.info("Đã khóa chapter thành công: chapterId={}, chapterNumber={}",
+                            chapter.getId(), chapter.getChapterNumber());
+                } else {
+                    failures.add(new ChapterBatchLockResponse.ChapterLockFailure(
+                            chapter.getId(), chapter.getChapterNumber(), chapter.getTitle(),
+                            "Không thể tạo payment setting"));
+                }
+
+            } catch (Exception e) {
+                log.error("Lỗi khi khóa chapter {}: {}", chapter.getId(), e.getMessage());
+                failures.add(new ChapterBatchLockResponse.ChapterLockFailure(
+                        chapter.getId(), chapter.getChapterNumber(), chapter.getTitle(),
+                        "Lỗi hệ thống: " + e.getMessage()));
+            }
+        }
+
+        // Tạo response
+        ChapterBatchLockResponse response = new ChapterBatchLockResponse();
+        response.setStoryId(story.getId());
+        response.setStoryTitle(story.getTitle());
+        response.setStorySlug(story.getSlug());
+        response.setTotalChaptersProcessed(chaptersToLock.size());
+        response.setSuccessCount(successfulLocks.size());
+        response.setFailureCount(failures.size());
+        response.setSuccessfulLocks(successfulLocks);
+        response.setFailures(failures);
+
+        log.info("Hoàn thành khóa batch chapter: total={}, success={}, failure={}, skipped={}",
+                chaptersToLock.size(), successfulLocks.size(), failures.size(),
+                chaptersToLock.size() - successfulLocks.size() - failures.size());
+
+        return response;
+    }
+
+    /**
+     * Lấy danh sách chapter theo range chapter number
+     */
+    private List<Chapter> getChaptersByRange(Long storyId, Integer chapterStart, Integer chapterEnd) {
+        return chapterRepository.findByStoryIdAndChapterNumberBetweenOrderByChapterNumber(
+                storyId, chapterStart, chapterEnd);
     }
 
     /**

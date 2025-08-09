@@ -1,6 +1,8 @@
 package com.meobeo.truyen.controller.chapter;
 
+import com.meobeo.truyen.domain.request.chapter.ChapterBatchLockRequest;
 import com.meobeo.truyen.domain.request.chapter.ChapterLockRequest;
+import com.meobeo.truyen.domain.response.chapter.ChapterBatchLockResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterPaymentResponse;
 import com.meobeo.truyen.service.interfaces.ChapterPaymentService;
 import com.meobeo.truyen.utils.ApiResponse;
@@ -122,5 +124,24 @@ public class ChapterPaymentController {
         chapterPaymentService.removeChapterPayment(chapterId, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Xóa payment setting thành công", null));
+    }
+
+    /**
+     * POST /api/v1/chapters/batch/lock - Khóa nhiều chapter cùng lúc
+     * Hỗ trợ khóa 1 chapter cụ thể hoặc khóa theo range chapter number
+     * Chỉ ADMIN và UPLOADER được phép thực hiện
+     */
+    @PostMapping("/chapters/batch/lock")
+    @PreAuthorize("hasRole('UPLOADER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ChapterBatchLockResponse>> lockChaptersBatch(
+            @Valid @RequestBody ChapterBatchLockRequest request) {
+
+        log.info("API khóa batch chapter được gọi: storyId={}, chapterId={}, range={}~{}",
+                request.getStoryId(), request.getChapterId(), request.getChapterStart(), request.getChapterEnd());
+
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
+        ChapterBatchLockResponse response = chapterPaymentService.lockChaptersBatch(request, userId);
+
+        return ResponseEntity.ok(ApiResponse.success("Khóa batch chapter hoàn thành", response));
     }
 }
