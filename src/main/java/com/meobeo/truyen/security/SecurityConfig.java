@@ -43,6 +43,8 @@ public class SecurityConfig {
                         "/api/v1/stories/{storyId}/chapters/{chapterNumber}/next",
                         "/api/v1/stories/{storyId}/chapters/{chapterNumber}/previous",
                         "/api/v1/stories/{storyId}/chapters/{chapterNumber}/comments",
+                        "/api/v1/stories/{storyId}/comments",
+                        "/api/v1/stories/{storyId}/comments/count",
                         "/api/v1/chapters/{slug}",
                         "/api/v1/chapters/{id}/next",
                         "/api/v1/chapters/{id}/previous",

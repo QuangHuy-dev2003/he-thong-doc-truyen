@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -25,6 +26,10 @@ public class StoryComment {
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     // Quan hệ với Story - Many-to-One
     @ManyToOne(fetch = FetchType.LAZY)
