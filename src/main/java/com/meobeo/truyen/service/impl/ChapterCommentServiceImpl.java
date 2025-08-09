@@ -5,6 +5,7 @@ import com.meobeo.truyen.domain.entity.ChapterComment;
 import com.meobeo.truyen.domain.entity.Story;
 import com.meobeo.truyen.domain.entity.User;
 import com.meobeo.truyen.domain.request.comment.CreateCommentRequest;
+import com.meobeo.truyen.domain.request.comment.UpdateCommentRequest;
 import com.meobeo.truyen.domain.response.comment.CommentResponse;
 import com.meobeo.truyen.domain.response.comment.CommentListResponse;
 import com.meobeo.truyen.exception.ResourceNotFoundException;
@@ -25,7 +26,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +43,10 @@ public class ChapterCommentServiceImpl implements ChapterCommentService {
     // Rate limiting: không cho comment quá 3 lần trong 5 phút
     private static final int MAX_COMMENTS_PER_PERIOD = 3;
     private static final int RATE_LIMIT_MINUTES = 5;
+
+    // Rate limiting cho update: không cho update quá 3 lần trong 5 phút
+    private static final int MAX_UPDATES_PER_PERIOD = 3;
+    private static final int UPDATE_RATE_LIMIT_MINUTES = 5;
 
     @Override
     @Transactional
@@ -95,7 +99,7 @@ public class ChapterCommentServiceImpl implements ChapterCommentService {
                 storyId, chapterNumber, pageable.getPageNumber(), pageable.getPageSize());
 
         // Kiểm tra story tồn tại
-        Story story = storyRepository.findById(storyId)
+        storyRepository.findById(storyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy truyện với ID: " + storyId));
 
         // Kiểm tra chapter tồn tại
@@ -106,11 +110,6 @@ public class ChapterCommentServiceImpl implements ChapterCommentService {
         // Lấy comments với phân trang
         Page<ChapterComment> commentsPage = chapterCommentRepository
                 .findByStoryIdAndChapterNumberOrderByCreatedAtDesc(storyId, chapterNumber, pageable);
-
-        // Convert sang CommentResponse
-        List<CommentResponse> commentResponses = commentsPage.getContent().stream()
-                .map(commentMapper::toCommentResponse)
-                .toList();
 
         // Tạo Page<CommentResponse> để dùng trong CommentListResponse
         Page<CommentResponse> responsePage = commentsPage.map(commentMapper::toCommentResponse);
@@ -158,6 +157,45 @@ public class ChapterCommentServiceImpl implements ChapterCommentService {
 
     @Override
     @Transactional
+    public CommentResponse updateComment(Long commentId, UpdateCommentRequest request, Long userId) {
+        log.info("Cập nhật comment: commentId={}, userId={}", commentId, userId);
+
+        // Validate content filter
+        contentFilterUtil.validateContent(request.getContent());
+
+        // Lấy comment với thông tin chi tiết
+        ChapterComment comment = chapterCommentRepository.findByIdWithDetails(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy comment với ID: " + commentId));
+
+        // Kiểm tra quyền sửa (chỉ admin hoặc người tạo comment)
+        boolean isAdmin = securityUtils.hasRole("ADMIN");
+        boolean isOwner = comment.getUser().getId().equals(userId);
+
+        if (!isAdmin && !isOwner) {
+            throw new ForbiddenException("Bạn không có quyền sửa comment này");
+        }
+
+        // Kiểm tra rate limiting cho update (chỉ áp dụng cho user thường, admin không
+        // bị giới hạn)
+        if (!isAdmin && !canUserUpdate(userId)) {
+            throw new IllegalArgumentException(
+                    String.format("Bạn chỉ có thể sửa comment tối đa %d lần trong %d phút. Vui lòng chờ một lúc.",
+                            MAX_UPDATES_PER_PERIOD, UPDATE_RATE_LIMIT_MINUTES));
+        }
+
+        // Cập nhật nội dung comment
+        comment.setContent(request.getContent().trim());
+
+        // Save comment (updatedAt sẽ được tự động cập nhật bởi @UpdateTimestamp)
+        ChapterComment updatedComment = chapterCommentRepository.save(comment);
+
+        log.info("Đã cập nhật comment thành công: commentId={}", commentId);
+
+        return commentMapper.toCommentResponse(updatedComment);
+    }
+
+    @Override
+    @Transactional
     public void deleteComment(Long commentId, Long userId) {
         log.info("Xóa comment: commentId={}, userId={}", commentId, userId);
 
@@ -197,5 +235,17 @@ public class ChapterCommentServiceImpl implements ChapterCommentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chapter với ID: " + chapterId));
 
         return chapterCommentRepository.countByStoryIdAndChapterId(chapter.getStory().getId(), chapterId);
+    }
+
+    /**
+     * Kiểm tra user có thể update comment không (rate limiting)
+     */
+    @Transactional(readOnly = true)
+    public boolean canUserUpdate(Long userId) {
+        // Kiểm tra số lần update gần đây của user
+        LocalDateTime sinceTime = LocalDateTime.now().minusMinutes(UPDATE_RATE_LIMIT_MINUTES);
+        Long recentUpdates = chapterCommentRepository.countRecentUpdatesByUser(userId, sinceTime);
+
+        return recentUpdates < MAX_UPDATES_PER_PERIOD;
     }
 }

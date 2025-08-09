@@ -1,6 +1,7 @@
 package com.meobeo.truyen.service.interfaces;
 
 import com.meobeo.truyen.domain.request.comment.CreateCommentRequest;
+import com.meobeo.truyen.domain.request.comment.UpdateCommentRequest;
 import com.meobeo.truyen.domain.response.comment.CommentResponse;
 import com.meobeo.truyen.domain.response.comment.CommentListResponse;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,11 @@ public interface ChapterCommentService {
      * Lấy danh sách comment của chapter theo chapterId
      */
     CommentListResponse getCommentsByChapter(Long chapterId, Pageable pageable);
+
+    /**
+     * Cập nhật comment (chỉ admin hoặc chính người tạo comment)
+     */
+    CommentResponse updateComment(Long commentId, UpdateCommentRequest request, Long userId);
 
     /**
      * Xóa comment (chỉ admin hoặc chính người tạo comment)

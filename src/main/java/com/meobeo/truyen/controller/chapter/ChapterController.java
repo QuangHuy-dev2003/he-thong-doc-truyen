@@ -3,6 +3,7 @@ package com.meobeo.truyen.controller.chapter;
 import com.meobeo.truyen.domain.request.chapter.CreateChapterRequest;
 import com.meobeo.truyen.domain.request.chapter.UpdateChapterRequest;
 import com.meobeo.truyen.domain.request.comment.CreateCommentRequest;
+import com.meobeo.truyen.domain.request.comment.UpdateCommentRequest;
 import com.meobeo.truyen.domain.response.chapter.ChapterResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterListResponse;
 import com.meobeo.truyen.domain.response.comment.CommentResponse;
@@ -305,6 +306,25 @@ public class ChapterController {
         CommentListResponse comments = chapterCommentService.getCommentsByChapter(chapterId, pageable);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách comment thành công", comments));
+    }
+
+    /**
+     * PUT /api/v1/comments/{commentId} - Cập nhật comment
+     * Chỉ ADMIN hoặc người tạo comment được phép sửa
+     * Yêu cầu đăng nhập và rate limiting: không quá 3 lần trong 5 phút
+     */
+    @PutMapping("/comments/{commentId}")
+    public ResponseEntity<ApiResponse<CommentResponse>> updateComment(
+            @PathVariable Long commentId,
+            @Valid @RequestBody UpdateCommentRequest request) {
+
+        log.info("API cập nhật comment được gọi: commentId={}", commentId);
+
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
+
+        CommentResponse updatedComment = chapterCommentService.updateComment(commentId, request, userId);
+
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật comment thành công", updatedComment));
     }
 
     /**
