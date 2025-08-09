@@ -15,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -127,8 +128,9 @@ public class ChapterPaymentController {
     }
 
     /**
-     * POST /api/v1/chapters/batch/lock - Khóa nhiều chapter cùng lúc
-     * Hỗ trợ khóa 1 chapter cụ thể hoặc khóa theo range chapter number
+     * POST /api/v1/chapters/batch/lock - Khóa nhiều chapter cùng lúc (sync)
+     * Hỗ trợ khóa 1 chapter cụ thể hoặc khóa theo range chapter number (tối đa 100
+     * chapter)
      * Chỉ ADMIN và UPLOADER được phép thực hiện
      */
     @PostMapping("/chapters/batch/lock")
@@ -139,9 +141,90 @@ public class ChapterPaymentController {
         log.info("API khóa batch chapter được gọi: storyId={}, chapterId={}, range={}~{}",
                 request.getStoryId(), request.getChapterId(), request.getChapterStart(), request.getChapterEnd());
 
+        // Giới hạn cho sync API
+        if (request.isRangeChapter()) {
+            int rangeSize = request.getChapterEnd() - request.getChapterStart() + 1;
+            if (rangeSize > 100) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error(
+                                "Sync API chỉ hỗ trợ tối đa 100 chapter. Dùng /batch/lock-async cho range lớn hơn"));
+            }
+        }
+
         Long userId = securityUtils.getCurrentUserIdOrThrow();
         ChapterBatchLockResponse response = chapterPaymentService.lockChaptersBatch(request, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Khóa batch chapter hoàn thành", response));
+    }
+
+    /**
+     * POST /api/v1/chapters/batch/lock-async - Khóa nhiều chapter bất đồng bộ
+     * (50-1000 chapter)
+     * Trả về jobId để client có thể track progress
+     * Chỉ ADMIN và UPLOADER được phép thực hiện
+     */
+    @PostMapping("/chapters/batch/lock-async")
+    @PreAuthorize("hasRole('UPLOADER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ChapterBatchLockResponse.AsyncBatchLockInfo>> lockChaptersBatchAsync(
+            @Valid @RequestBody ChapterBatchLockRequest request) {
+
+        log.info("API khóa batch chapter async được gọi: storyId={}, range={}~{}",
+                request.getStoryId(), request.getChapterStart(), request.getChapterEnd());
+
+        // Validation cho async
+        if (!request.isRangeChapter()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Async API chỉ hỗ trợ range chapter (chapterStart + chapterEnd)"));
+        }
+
+        int rangeSize = request.getChapterEnd() - request.getChapterStart() + 1;
+        if (rangeSize < 50) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse
+                            .error("Async API dành cho range >= 50 chapter. Dùng /batch/lock cho range nhỏ hơn"));
+        }
+        if (rangeSize > 1000) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Không thể khóa quá 1000 chapter cùng lúc"));
+        }
+
+        Long userId = securityUtils.getCurrentUserIdOrThrow();
+
+        // Bắt đầu async processing và nhận jobId
+        String jobId = chapterPaymentService.startAsyncBatchLock(request, userId);
+
+        // Tạo response info
+        ChapterBatchLockResponse.AsyncBatchLockInfo asyncInfo = new ChapterBatchLockResponse.AsyncBatchLockInfo(jobId,
+                "Đang xử lý khóa " + rangeSize + " chapter", rangeSize);
+
+        return ResponseEntity.accepted()
+                .body(ApiResponse.success("Bắt đầu xử lý batch lock bất đồng bộ", asyncInfo));
+    }
+
+    /**
+     * GET /api/v1/chapters/batch/status/{jobId} - Kiểm tra trạng thái job async
+     * Chỉ ADMIN và UPLOADER được phép thực hiện
+     */
+    @GetMapping("/chapters/batch/status/{jobId}")
+    @PreAuthorize("hasRole('UPLOADER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ChapterBatchLockResponse>> getAsyncJobStatus(@PathVariable String jobId) {
+
+        log.info("API kiểm tra trạng thái job async được gọi: jobId={}", jobId);
+
+        Optional<ChapterBatchLockResponse> result = chapterPaymentService.getAsyncJobStatus(jobId);
+
+        if (result.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ChapterBatchLockResponse response = result.get();
+        String message = switch (response.getStatus()) {
+            case "PROCESSING" -> "Job đang xử lý";
+            case "COMPLETED" -> "Job hoàn thành";
+            case "FAILED" -> "Job thất bại";
+            default -> "Trạng thái không xác định";
+        };
+
+        return ResponseEntity.ok(ApiResponse.success(message, response));
     }
 }

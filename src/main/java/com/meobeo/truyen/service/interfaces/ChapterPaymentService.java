@@ -6,6 +6,7 @@ import com.meobeo.truyen.domain.response.chapter.ChapterBatchLockResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterPaymentResponse;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ChapterPaymentService {
 
@@ -63,4 +64,15 @@ public interface ChapterPaymentService {
      * Hỗ trợ khóa 1 chapter cụ thể hoặc khóa theo range chapter number
      */
     ChapterBatchLockResponse lockChaptersBatch(ChapterBatchLockRequest request, Long userId);
+
+    /**
+     * Khóa nhiều chapter bất đồng bộ (cho range lớn > 50 chapters)
+     * Trả về jobId để track progress
+     */
+    String startAsyncBatchLock(ChapterBatchLockRequest request, Long userId);
+
+    /**
+     * Lấy trạng thái job async batch lock
+     */
+    Optional<ChapterBatchLockResponse> getAsyncJobStatus(String jobId);
 }

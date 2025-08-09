@@ -18,12 +18,18 @@ import com.meobeo.truyen.service.interfaces.ChapterPaymentService;
 import com.meobeo.truyen.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +41,9 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
     private final ChapterRepository chapterRepository;
     private final StoryRepository storyRepository;
     private final SecurityUtils securityUtils;
+
+    // Store async job results in memory (trong production nên dùng Redis)
+    private final ConcurrentHashMap<String, ChapterBatchLockResponse> asyncJobResults = new ConcurrentHashMap<>();
 
     @Override
     @Transactional
@@ -335,6 +344,171 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
                 chaptersToLock.size() - successfulLocks.size() - failures.size());
 
         return response;
+    }
+
+    @Override
+    public String startAsyncBatchLock(ChapterBatchLockRequest request, Long userId) {
+        String jobId = UUID.randomUUID().toString();
+        log.info("Khởi tạo async batch lock: jobId={}, storyId={}, userId={}", jobId, request.getStoryId(), userId);
+
+        // Validation range size cho async
+        if (request.isRangeChapter()) {
+            int rangeSize = request.getChapterEnd() - request.getChapterStart() + 1;
+            if (rangeSize < 50) {
+                throw new BadRequestException("Async chỉ dành cho range >= 50 chapter");
+            }
+            if (rangeSize > 1000) {
+                throw new BadRequestException("Không thể khóa quá 1000 chapter cùng lúc");
+            }
+        }
+
+        // Tạo initial response
+        ChapterBatchLockResponse initialResponse = new ChapterBatchLockResponse();
+        initialResponse.setJobId(jobId);
+        initialResponse.setStatus("PROCESSING");
+        initialResponse.setStartTime(LocalDateTime.now());
+        asyncJobResults.put(jobId, initialResponse);
+
+        // Bắt đầu xử lý async
+        lockChaptersBatchAsync(request, userId, jobId);
+
+        return jobId;
+    }
+
+    @Async("taskExecutor")
+    private void lockChaptersBatchAsync(ChapterBatchLockRequest request, Long userId, String jobId) {
+        log.info("Bắt đầu async batch lock: jobId={}, storyId={}, userId={}", jobId, request.getStoryId(), userId);
+
+        try {
+            // Xử lý async với chunks để tránh transaction quá lớn
+            ChapterBatchLockResponse response = processLargeBatchInChunks(request, userId, jobId);
+
+            // Lưu kết quả cuối cùng
+            response.setJobId(jobId);
+            response.setStatus("COMPLETED");
+            response.setEndTime(LocalDateTime.now());
+            asyncJobResults.put(jobId, response);
+
+            log.info("Hoàn thành async batch lock: jobId={}, success={}, failure={}",
+                    jobId, response.getSuccessCount(), response.getFailureCount());
+
+        } catch (Exception e) {
+            log.error("Lỗi async batch lock: jobId={}", jobId, e);
+
+            ChapterBatchLockResponse errorResponse = new ChapterBatchLockResponse();
+            errorResponse.setJobId(jobId);
+            errorResponse.setStatus("FAILED");
+            errorResponse.setEndTime(LocalDateTime.now());
+            errorResponse.setFailureCount(1);
+            errorResponse.setSuccessCount(0);
+
+            asyncJobResults.put(jobId, errorResponse);
+        }
+    }
+
+    @Override
+    public Optional<ChapterBatchLockResponse> getAsyncJobStatus(String jobId) {
+        return Optional.ofNullable(asyncJobResults.get(jobId));
+    }
+
+    /**
+     * Xử lý batch lớn bằng cách chia thành chunks nhỏ
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    private ChapterBatchLockResponse processLargeBatchInChunks(ChapterBatchLockRequest request, Long userId,
+            String jobId) {
+        final int CHUNK_SIZE = 50; // Xử lý 50 chapter mỗi lần
+
+        // Tạo initial response để lưu progress
+        ChapterBatchLockResponse initialResponse = new ChapterBatchLockResponse();
+        initialResponse.setJobId(jobId);
+        initialResponse.setStatus("PROCESSING");
+        initialResponse.setStartTime(LocalDateTime.now());
+        asyncJobResults.put(jobId, initialResponse);
+
+        List<ChapterPaymentResponse> allSuccessfulLocks = new ArrayList<>();
+        List<ChapterBatchLockResponse.ChapterLockFailure> allFailures = new ArrayList<>();
+
+        int start = request.getChapterStart();
+        int end = request.getChapterEnd();
+        int totalChapters = end - start + 1;
+
+        // Lấy story info
+        Story story = storyRepository.findById(request.getStoryId())
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy story với ID: " + request.getStoryId()));
+
+        // Xử lý từng chunk
+        for (int chunkStart = start; chunkStart <= end; chunkStart += CHUNK_SIZE) {
+            int chunkEnd = Math.min(chunkStart + CHUNK_SIZE - 1, end);
+
+            try {
+                // Tạo request cho chunk này
+                ChapterBatchLockRequest chunkRequest = new ChapterBatchLockRequest();
+                chunkRequest.setStoryId(request.getStoryId());
+                chunkRequest.setChapterStart(chunkStart);
+                chunkRequest.setChapterEnd(chunkEnd);
+                chunkRequest.setPrice(request.getPrice());
+                chunkRequest.setIsVipOnly(request.getIsVipOnly());
+
+                // Xử lý chunk với transaction riêng
+                ChapterBatchLockResponse chunkResponse = processChunkSeparately(chunkRequest, userId);
+
+                // Tổng hợp kết quả
+                allSuccessfulLocks.addAll(chunkResponse.getSuccessfulLocks());
+                allFailures.addAll(chunkResponse.getFailures());
+
+                int processed = chunkEnd - start + 1;
+                log.info("Hoàn thành chunk {}-{}: jobId={}, progress={}/{}",
+                        chunkStart, chunkEnd, jobId, processed, totalChapters);
+
+                // Update progress trong map
+                ChapterBatchLockResponse progressResponse = new ChapterBatchLockResponse();
+                progressResponse.setJobId(jobId);
+                progressResponse.setStatus("PROCESSING");
+                progressResponse.setStartTime(initialResponse.getStartTime());
+                progressResponse.setStoryId(story.getId());
+                progressResponse.setStoryTitle(story.getTitle());
+                progressResponse.setStorySlug(story.getSlug());
+                progressResponse.setTotalChaptersProcessed(processed);
+                progressResponse.setSuccessCount(allSuccessfulLocks.size());
+                progressResponse.setFailureCount(allFailures.size());
+
+                asyncJobResults.put(jobId, progressResponse);
+
+            } catch (Exception e) {
+                log.error("Lỗi xử lý chunk {}-{}: jobId={}", chunkStart, chunkEnd, jobId, e);
+
+                // Thêm failure cho toàn bộ chunk
+                for (int i = chunkStart; i <= chunkEnd; i++) {
+                    allFailures.add(new ChapterBatchLockResponse.ChapterLockFailure(
+                            null, i, "Chapter " + i, "Lỗi chunk: " + e.getMessage()));
+                }
+            }
+        }
+
+        // Tạo response cuối cùng
+        ChapterBatchLockResponse finalResponse = new ChapterBatchLockResponse();
+        finalResponse.setJobId(jobId);
+        finalResponse.setStoryId(story.getId());
+        finalResponse.setStoryTitle(story.getTitle());
+        finalResponse.setStorySlug(story.getSlug());
+        finalResponse.setTotalChaptersProcessed(totalChapters);
+        finalResponse.setSuccessCount(allSuccessfulLocks.size());
+        finalResponse.setFailureCount(allFailures.size());
+        finalResponse.setSuccessfulLocks(allSuccessfulLocks);
+        finalResponse.setFailures(allFailures);
+        finalResponse.setStartTime(initialResponse.getStartTime());
+
+        return finalResponse;
+    }
+
+    /**
+     * Xử lý một chunk với transaction riêng biệt
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    private ChapterBatchLockResponse processChunkSeparately(ChapterBatchLockRequest request, Long userId) {
+        return lockChaptersBatch(request, userId);
     }
 
     /**
