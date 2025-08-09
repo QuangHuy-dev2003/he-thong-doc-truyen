@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "favorites")
 @Data
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(exclude = { "user", "story" })
 @ToString(exclude = { "user", "story" })
 public class Favorite {
 

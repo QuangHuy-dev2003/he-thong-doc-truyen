@@ -13,8 +13,8 @@ import java.util.Set;
 @Entity
 @Table(name = "chapters")
 @Data
-@EqualsAndHashCode(callSuper = false)
-@ToString(exclude = { "story", "unlocks", "readingHistory", "comments" })
+@EqualsAndHashCode(exclude = { "story", "unlocks", "readingHistory", "comments", "payment", "vipDiscounts" })
+@ToString(exclude = { "story", "unlocks", "readingHistory", "comments", "payment", "vipDiscounts" })
 public class Chapter {
 
     @Id

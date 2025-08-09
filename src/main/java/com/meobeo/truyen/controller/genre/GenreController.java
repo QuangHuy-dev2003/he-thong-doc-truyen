@@ -28,7 +28,7 @@ public class GenreController {
     private final GenreService genreService;
 
     @PostMapping("/genres/create")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<GenreResponseDto>> createGenre(
             @Valid @RequestBody CreateGenreDto createGenreDto) {
         log.info("Nhận request tạo thể loại: {}", createGenreDto.getName());
@@ -40,7 +40,7 @@ public class GenreController {
     }
 
     @PutMapping("/genres/update/{id}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<GenreResponseDto>> updateGenre(
             @PathVariable Long id,
             @Valid @RequestBody UpdateGenreDto updateGenreDto) {
@@ -118,7 +118,7 @@ public class GenreController {
     }
 
     @DeleteMapping("/genres/delete/{id}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> deleteGenre(@PathVariable Long id) {
         log.info("Nhận request xóa thể loại với ID: {}", id);
 

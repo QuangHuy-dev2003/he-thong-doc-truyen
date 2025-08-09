@@ -53,7 +53,7 @@ alwaysApply: true
 ## 📊 JPA – Query – Index:
 
 - Khi làm việc với các bảng lớn như `chapters`, `stories`, `reading_history`, `chapter_unlocks`…:
-  - ✅ Luôn xác định rõ truy vấn chính để tạo **index phù hợp** trong MySQL.
+  - ✅ Luôn xác định rõ truy vấn chính để tạo **index phù hợp** trong PostgreSQL.
 - Nếu dùng JPA filter như:
   - Lọc chương theo `story_slug`, `chapter_number` → dùng composite index `(story_id, chapter_number)`
   - Kiểm tra unlock chương → index `(user_id, chapter_id)`
@@ -63,6 +63,7 @@ alwaysApply: true
   - FETCH để tránh lazy loading chậm
 - Nếu phân trang → bắt buộc dùng `Pageable`
 - Nếu cần tìm kiếm nâng cao (keyword, tag, tác giả,…) → index FULLTEXT hoặc ElasticSearch (nếu mở rộng)
+- Viết câu truy vấn sao cho tối ưu với PostgreSQL nhất.
 
 ## 🚀 Performance:
 
@@ -133,11 +134,32 @@ alwaysApply: true
 
 ---
 
-## Không tạo file README để hướng dẫn sử dụng
+## 👀 Đọc context và mã nguồn hiện tại
+
+- Trước khi tạo hoặc chỉnh sửa file, **luôn phải đọc, phân tích kỹ toàn bộ mã nguồn hiện tại của project**.
+- Nếu phát hiện chức năng đã tồn tại, chỉ update đúng logic hoặc refactor, **KHÔNG được tạo file mới trùng chức năng**.
+- Khi thực hiện các bước (TODO) cần ưu tiên **tái sử dụng code cũ**, tránh duplicate logic.
+- Nếu có nghi ngờ về file/class đã tồn tại hay chưa, hãy hỏi lại user hoặc tự động kiểm tra.
+
+## ⛔ Quy tắc không tự ý tạo file
+
+- **KHÔNG tự động sinh thêm bất kỳ file nào ngoài các file đúng với chức năng user yêu cầu, đặc biệt là các file ví dụ, template, script, test không cần thiết.**
+- **KHÔNG tự động tạo các class, interface, entity, config, hoặc bất kỳ resource nào nếu trong mã nguồn đã có sẵn hoặc user không yêu cầu bổ sung.**
+- **TRƯỚC KHI tạo file mới, phải kiểm tra kỹ mã nguồn hiện tại, tránh tạo trùng tên, trùng chức năng hoặc sinh file không cần thiết.**
+- **CHỈ tạo mới nếu chắc chắn chưa tồn tại, hoặc có thay đổi lớn được yêu cầu rõ ràng. Nếu phân vân nên hỏi lại user.**
+- Nếu user yêu cầu sửa/chỉnh sửa thì phải chỉnh trực tiếp file hiện có, **KHÔNG tạo file mới thay thế**.
+- Không tạo file `example`, `sample`, `test`, `mock`, `data.sql`, hoặc các file mang tính chất hướng dẫn demo, trừ khi có chỉ thị rõ.
+- Không tự sinh file service, repository, entity, dto nếu mã nguồn đã có class tương ứng – **luôn ưu tiên update file hiện có**.
 
 - Không tự động tạo file README.md để hướng dẫn sử dụng.
 - Và không tự tạo những file không liên quan về ví dụ sử dụng hay gì.
 - Không sử dụng Emoji trong mã nguồn trừ khi có yêu cầu.
+
+## 📂 Quy tắc trả về file và cấu trúc
+
+- Khi trả về nhiều file, **chỉ trả đúng và đủ file liên quan trực tiếp đến tính năng được yêu cầu**.
+- Không tự chia nhỏ hoặc tách file ra nếu không có lý do kỹ thuật rõ ràng hoặc không có chỉ đạo từ user.
+- Nếu sửa một logic nhỏ hoặc API, **chỉ trả file liên quan, không "bonus" thêm file khác không được yêu cầu**.
 
 ## Yêu cầu viết Commit
 

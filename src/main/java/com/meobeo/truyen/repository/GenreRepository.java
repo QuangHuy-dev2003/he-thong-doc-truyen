@@ -15,21 +15,21 @@ import java.util.Optional;
 public interface GenreRepository extends JpaRepository<Genre, Long> {
 
     Optional<Genre> findByName(String name);
-    
+
     boolean existsByName(String name);
-    
+
     @Query("SELECT g FROM Genre g WHERE g.name LIKE %:keyword% ORDER BY g.name")
     Page<Genre> findByNameContainingIgnoreCase(@Param("keyword") String keyword, Pageable pageable);
-    
+
     @Query("SELECT g FROM Genre g ORDER BY g.name")
     Page<Genre> findAllOrderByName(Pageable pageable);
-    
+
     @Query("SELECT g FROM Genre g LEFT JOIN FETCH g.stories WHERE g.id = :id")
     Optional<Genre> findByIdWithStories(@Param("id") Long id);
-    
+
     @Query("SELECT g FROM Genre g LEFT JOIN FETCH g.stories")
     List<Genre> findAllWithStories();
-    
+
     @Query("SELECT g FROM Genre g LEFT JOIN FETCH g.stories WHERE g.name LIKE %:keyword% ORDER BY g.name")
     List<Genre> findByNameContainingWithStories(@Param("keyword") String keyword);
-} 
+}

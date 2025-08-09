@@ -33,7 +33,11 @@ public class SecurityConfig {
                         "/api/v1/genres/all",
                         "/api/v1/genres/search",
                         "/api/v1/genres/check-name/{name}",
-                        "/api/v1/genres/dropdown"
+                        "/api/v1/genres/dropdown",
+                        "/api/v1/stories/{identifier}",
+                        "/api/v1/stories/filter",
+                        "/api/v1/stories/check-slug/{slug}",
+                        "/api/v1/stories/author/{authorId}"
         };
 
         @Bean

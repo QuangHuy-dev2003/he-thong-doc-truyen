@@ -11,8 +11,8 @@ import java.util.Set;
 @Entity
 @Table(name = "genres")
 @Data
-@EqualsAndHashCode(callSuper = false)
-@ToString(exclude = "stories")
+@EqualsAndHashCode(exclude = { "stories" })
+@ToString(exclude = { "stories" })
 public class Genre {
 
     @Id

@@ -14,8 +14,8 @@ import java.util.Set;
 @Entity
 @Table(name = "stories")
 @Data
-@EqualsAndHashCode(callSuper = false)
-@ToString(exclude = { "chapters", "genres", "favorites", "votes", "comments" })
+@EqualsAndHashCode(exclude = { "genres", "chapters", "favorites", "votes", "comments" })
+@ToString(exclude = { "genres", "chapters", "favorites", "votes", "comments" })
 public class Story {
 
     @Id
@@ -33,6 +33,9 @@ public class Story {
 
     @Column(name = "cover_image_url")
     private String coverImageUrl;
+
+    @Column(name = "author_name")
+    private String authorName;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
