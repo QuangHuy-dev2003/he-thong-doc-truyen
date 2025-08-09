@@ -5,6 +5,7 @@ import com.meobeo.truyen.domain.entity.Story;
 import com.meobeo.truyen.domain.request.chapter.CreateChapterRequest;
 import com.meobeo.truyen.domain.request.chapter.UpdateChapterRequest;
 import com.meobeo.truyen.domain.response.chapter.ChapterResponse;
+import com.meobeo.truyen.domain.response.chapter.ChapterSummaryDto;
 import com.meobeo.truyen.domain.response.chapter.ChapterListResponse;
 import com.meobeo.truyen.exception.ForbiddenException;
 import com.meobeo.truyen.exception.ResourceNotFoundException;
@@ -159,17 +160,34 @@ public class ChapterServiceImpl implements ChapterService {
         log.info("Lấy danh sách chapter của truyện: storyIdentifier={}", storyIdentifier);
 
         Page<Chapter> chapterPage;
+        Story story = null;
+
         try {
             // Thử parse thành ID
             Long storyId = Long.parseLong(storyIdentifier);
             chapterPage = chapterRepository.findByStoryIdOrderByChapterNumber(storyId, pageable);
+            // Lấy thông tin story
+            if (!chapterPage.isEmpty()) {
+                story = chapterPage.getContent().get(0).getStory();
+            } else {
+                story = getStoryById(storyId);
+            }
         } catch (NumberFormatException e) {
             // Nếu không phải số thì tìm theo slug
             chapterPage = chapterRepository.findByStorySlugOrderByChapterNumber(storyIdentifier, pageable);
+            // Lấy thông tin story
+            if (!chapterPage.isEmpty()) {
+                story = chapterPage.getContent().get(0).getStory();
+            } else {
+                story = getStoryBySlug(storyIdentifier);
+            }
         }
 
-        Page<ChapterResponse> responsePage = chapterPage.map(chapterMapper::toChapterResponse);
-        return ChapterListResponse.fromPage(responsePage);
+        // Convert thành ChapterSummaryDto (không có content)
+        Page<ChapterSummaryDto> summaryPage = chapterPage.map(chapterMapper::toChapterSummaryDto);
+
+        return ChapterListResponse.fromPageWithStoryInfo(summaryPage,
+                story.getId(), story.getTitle(), story.getSlug());
     }
 
     @Override
@@ -234,6 +252,11 @@ public class ChapterServiceImpl implements ChapterService {
     private Story getStoryById(Long storyId) {
         return storyRepository.findById(storyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy truyện: " + storyId));
+    }
+
+    private Story getStoryBySlug(String slug) {
+        return storyRepository.findBySlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy truyện: " + slug));
     }
 
     private Chapter getChapterById(Long chapterId) {

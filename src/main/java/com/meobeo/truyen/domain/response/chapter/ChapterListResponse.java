@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 public class ChapterListResponse {
 
-    private List<ChapterResponse> content;
+    private List<ChapterSummaryDto> content;
     private int page;
     private int size;
     private long totalElements;
@@ -21,7 +21,7 @@ public class ChapterListResponse {
     private String storyTitle;
     private String storySlug;
 
-    public static ChapterListResponse fromPage(Page<ChapterResponse> page) {
+    public static ChapterListResponse fromPage(Page<ChapterSummaryDto> page) {
         ChapterListResponse response = new ChapterListResponse();
         response.setContent(page.getContent());
         response.setPage(page.getNumber());
@@ -31,14 +31,15 @@ public class ChapterListResponse {
         response.setHasNext(page.hasNext());
         response.setHasPrevious(page.hasPrevious());
 
-        // Lấy thông tin story từ chapter đầu tiên nếu có
-        if (!page.getContent().isEmpty()) {
-            ChapterResponse firstChapter = page.getContent().get(0);
-            response.setStoryId(firstChapter.getStoryId());
-            response.setStoryTitle(firstChapter.getStoryTitle());
-            response.setStorySlug(firstChapter.getStorySlug());
-        }
+        return response;
+    }
 
+    public static ChapterListResponse fromPageWithStoryInfo(Page<ChapterSummaryDto> page,
+            Long storyId, String storyTitle, String storySlug) {
+        ChapterListResponse response = fromPage(page);
+        response.setStoryId(storyId);
+        response.setStoryTitle(storyTitle);
+        response.setStorySlug(storySlug);
         return response;
     }
 }

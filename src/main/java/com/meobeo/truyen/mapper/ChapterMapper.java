@@ -2,6 +2,7 @@ package com.meobeo.truyen.mapper;
 
 import com.meobeo.truyen.domain.entity.Chapter;
 import com.meobeo.truyen.domain.response.chapter.ChapterResponse;
+import com.meobeo.truyen.domain.response.chapter.ChapterSummaryDto;
 import com.meobeo.truyen.repository.ChapterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,29 @@ public class ChapterMapper {
         response.setIsPurchased(true);
 
         return response;
+    }
+
+    /**
+     * Convert Chapter entity thành ChapterSummaryDto (không có content và
+     * navigation)
+     */
+    public ChapterSummaryDto toChapterSummaryDto(Chapter chapter) {
+        if (chapter == null) {
+            return null;
+        }
+
+        ChapterSummaryDto summary = new ChapterSummaryDto();
+        summary.setId(chapter.getId());
+        summary.setChapterNumber(chapter.getChapterNumber());
+        summary.setSlug(chapter.getSlug());
+        summary.setTitle(chapter.getTitle());
+        summary.setCreatedAt(chapter.getCreatedAt());
+
+        // Thông tin trạng thái - TODO: implement logic kiểm tra locked/purchased
+        summary.setIsLocked(false);
+        summary.setIsPurchased(true);
+
+        return summary;
     }
 
     private void setNavigationInfo(ChapterResponse response, Chapter chapter) {
