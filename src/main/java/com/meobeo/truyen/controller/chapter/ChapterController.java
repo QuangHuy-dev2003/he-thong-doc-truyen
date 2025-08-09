@@ -151,14 +151,17 @@ public class ChapterController {
     }
 
     /**
-     * GET /api/v1/chapters/{id}/next - Lấy chapter tiếp theo (Public)
+     * GET /api/v1/stories/{storyId}/chapters/{chapterNumber}/next - Lấy chapter
+     * tiếp theo (Public)
      */
-    @GetMapping("/chapters/{id}/next")
-    public ResponseEntity<ApiResponse<ChapterResponse>> getNextChapter(@PathVariable Long id) {
+    @GetMapping("/stories/{storyId}/chapters/{chapterNumber}/next")
+    public ResponseEntity<ApiResponse<ChapterResponse>> getNextChapter(
+            @PathVariable Long storyId,
+            @PathVariable Integer chapterNumber) {
 
-        log.info("API lấy chapter tiếp theo được gọi: chapterId={}", id);
+        log.info("API lấy chapter tiếp theo được gọi: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        ChapterResponse nextChapter = chapterService.getNextChapter(id);
+        ChapterResponse nextChapter = chapterService.getNextChapterByStoryAndNumber(storyId, chapterNumber);
 
         if (nextChapter != null) {
             return ResponseEntity.ok(ApiResponse.success("Lấy chapter tiếp theo thành công", nextChapter));
@@ -168,14 +171,17 @@ public class ChapterController {
     }
 
     /**
-     * GET /api/v1/chapters/{id}/previous - Lấy chapter trước đó (Public)
+     * GET /api/v1/stories/{storyId}/chapters/{chapterNumber}/previous - Lấy chapter
+     * trước đó (Public)
      */
-    @GetMapping("/chapters/{id}/previous")
-    public ResponseEntity<ApiResponse<ChapterResponse>> getPreviousChapter(@PathVariable Long id) {
+    @GetMapping("/stories/{storyId}/chapters/{chapterNumber}/previous")
+    public ResponseEntity<ApiResponse<ChapterResponse>> getPreviousChapter(
+            @PathVariable Long storyId,
+            @PathVariable Integer chapterNumber) {
 
-        log.info("API lấy chapter trước đó được gọi: chapterId={}", id);
+        log.info("API lấy chapter trước đó được gọi: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        ChapterResponse previousChapter = chapterService.getPreviousChapter(id);
+        ChapterResponse previousChapter = chapterService.getPreviousChapterByStoryAndNumber(storyId, chapterNumber);
 
         if (previousChapter != null) {
             return ResponseEntity.ok(ApiResponse.success("Lấy chapter trước đó thành công", previousChapter));

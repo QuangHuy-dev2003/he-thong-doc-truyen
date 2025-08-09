@@ -215,6 +215,26 @@ public class ChapterServiceImpl implements ChapterService {
 
     @Override
     @Transactional(readOnly = true)
+    public ChapterResponse getNextChapterByStoryAndNumber(Long storyId, Integer chapterNumber) {
+        log.info("Lấy chapter tiếp theo theo story và number: storyId={}, chapterNumber={}", storyId, chapterNumber);
+
+        return chapterRepository.findNextChapter(storyId, chapterNumber)
+                .map(chapterMapper::toChapterResponse)
+                .orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ChapterResponse getPreviousChapterByStoryAndNumber(Long storyId, Integer chapterNumber) {
+        log.info("Lấy chapter trước đó theo story và number: storyId={}, chapterNumber={}", storyId, chapterNumber);
+
+        return chapterRepository.findPreviousChapter(storyId, chapterNumber)
+                .map(chapterMapper::toChapterResponse)
+                .orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean canEditChapter(Long chapterId, Long userId) {
         try {
             Chapter chapter = getChapterById(chapterId);

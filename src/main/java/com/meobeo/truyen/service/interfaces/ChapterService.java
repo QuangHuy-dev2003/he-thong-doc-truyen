@@ -55,6 +55,16 @@ public interface ChapterService {
     ChapterResponse getPreviousChapter(Long chapterId);
 
     /**
+     * Lấy chapter tiếp theo theo storyId và chapterNumber
+     */
+    ChapterResponse getNextChapterByStoryAndNumber(Long storyId, Integer chapterNumber);
+
+    /**
+     * Lấy chapter trước đó theo storyId và chapterNumber
+     */
+    ChapterResponse getPreviousChapterByStoryAndNumber(Long storyId, Integer chapterNumber);
+
+    /**
      * Kiểm tra quyền chỉnh sửa chapter
      */
     boolean canEditChapter(Long chapterId, Long userId);
