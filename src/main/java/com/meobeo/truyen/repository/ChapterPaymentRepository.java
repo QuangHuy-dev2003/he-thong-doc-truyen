@@ -1,0 +1,60 @@
+package com.meobeo.truyen.repository;
+
+import com.meobeo.truyen.domain.entity.ChapterPayment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface ChapterPaymentRepository extends JpaRepository<ChapterPayment, Long> {
+
+    /**
+     * Tìm payment info theo chapter ID
+     */
+    Optional<ChapterPayment> findByChapterId(Long chapterId);
+
+    /**
+     * Tìm payment info theo chapter ID với thông tin chapter và story
+     */
+    @Query("SELECT cp FROM ChapterPayment cp " +
+            "JOIN FETCH cp.chapter c " +
+            "JOIN FETCH cp.story s " +
+            "WHERE cp.chapterId = :chapterId")
+    Optional<ChapterPayment> findByChapterIdWithDetails(@Param("chapterId") Long chapterId);
+
+    /**
+     * Lấy danh sách chapter payments của một story
+     */
+    @Query("SELECT cp FROM ChapterPayment cp " +
+            "WHERE cp.storyId = :storyId " +
+            "ORDER BY cp.chapter.chapterNumber ASC")
+    List<ChapterPayment> findByStoryIdOrderByChapterNumber(@Param("storyId") Long storyId);
+
+    /**
+     * Kiểm tra chapter có bị khóa không
+     */
+    @Query("SELECT cp.isLocked FROM ChapterPayment cp WHERE cp.chapterId = :chapterId")
+    Optional<Boolean> isChapterLocked(@Param("chapterId") Long chapterId);
+
+    /**
+     * Lấy giá của chapter
+     */
+    @Query("SELECT cp.price FROM ChapterPayment cp WHERE cp.chapterId = :chapterId")
+    Optional<Integer> getChapterPrice(@Param("chapterId") Long chapterId);
+
+    /**
+     * Đếm số chapter bị khóa trong story
+     */
+    @Query("SELECT COUNT(cp) FROM ChapterPayment cp " +
+            "WHERE cp.storyId = :storyId AND cp.isLocked = true")
+    Long countLockedChaptersByStory(@Param("storyId") Long storyId);
+
+    /**
+     * Kiểm tra xem có payment setting cho chapter hay chưa
+     */
+    boolean existsByChapterId(Long chapterId);
+}

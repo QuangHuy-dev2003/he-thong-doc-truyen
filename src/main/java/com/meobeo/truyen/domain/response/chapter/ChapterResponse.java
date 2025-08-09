@@ -23,9 +23,11 @@ public class ChapterResponse {
     private ChapterNavigationResponse previousChapter;
     private ChapterNavigationResponse nextChapter;
 
-    // Thông tin trạng thái
+    // Thông tin trạng thái và payment
     private Boolean isLocked;
     private Boolean isPurchased;
+    private Integer price;
+    private Boolean isVipOnly;
 
     @Data
     public static class ChapterNavigationResponse {
