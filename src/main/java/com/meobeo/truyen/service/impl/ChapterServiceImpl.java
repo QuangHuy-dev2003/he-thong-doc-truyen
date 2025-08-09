@@ -65,29 +65,25 @@ public class ChapterServiceImpl implements ChapterService {
     }
 
     @Override
-    public ChapterResponse updateChapter(Long chapterId, UpdateChapterRequest request, Long userId) {
-        log.info("Cập nhật chapter: chapterId={}, userId={}", chapterId, userId);
+    public ChapterResponse updateChapterByStoryAndNumber(Long storyId, Integer chapterNumber,
+            UpdateChapterRequest request, Long userId) {
+        log.info("Cập nhật chapter theo story và number: storyId={}, chapterNumber={}, userId={}", storyId,
+                chapterNumber, userId);
 
-        // Lấy chapter và kiểm tra quyền
-        Chapter chapter = getChapterById(chapterId);
+        // Lấy chapter theo storyId và chapterNumber
+        Chapter chapter = getChapterByStoryAndNumber(storyId, chapterNumber);
         validateEditPermissions(chapter.getStory(), userId);
 
-        // Validate slug nếu có thay đổi
-        if (!chapter.getSlug().equals(request.getSlug()) && isSlugExists(request.getSlug(), chapterId)) {
+        // Validate slug nếu có thay đổi (không cho phép update chapterNumber nữa)
+        if (!chapter.getSlug().equals(request.getSlug()) && isSlugExists(request.getSlug(), chapter.getId())) {
             throw new IllegalArgumentException("Slug đã tồn tại: " + request.getSlug());
         }
 
-        // Validate chapter number nếu có thay đổi
-        if (!chapter.getChapterNumber().equals(request.getChapterNumber()) &&
-                isChapterNumberExists(chapter.getStory().getId(), request.getChapterNumber(), chapterId)) {
-            throw new IllegalArgumentException("Số chapter đã tồn tại: " + request.getChapterNumber());
-        }
-
-        // Cập nhật thông tin chapter
+        // Cập nhật thông tin chapter (không update chapterNumber)
         chapter.setTitle(request.getTitle());
         chapter.setSlug(request.getSlug());
-        chapter.setChapterNumber(request.getChapterNumber());
         chapter.setContent(request.getContent());
+        // Không update chapterNumber vì đã xác định bằng URL
 
         Chapter updatedChapter = chapterRepository.save(chapter);
         log.info("Cập nhật chapter thành công: chapterId={}", updatedChapter.getId());
@@ -109,6 +105,20 @@ public class ChapterServiceImpl implements ChapterService {
     }
 
     @Override
+    public void deleteChapterByStoryAndNumber(Long storyId, Integer chapterNumber, Long userId) {
+        log.info("Xóa chapter theo story và number: storyId={}, chapterNumber={}, userId={}", storyId, chapterNumber,
+                userId);
+
+        // Lấy chapter theo storyId và chapterNumber
+        Chapter chapter = getChapterByStoryAndNumber(storyId, chapterNumber);
+        validateEditPermissions(chapter.getStory(), userId);
+
+        // Xóa chapter (cascade sẽ xóa các bảng liên quan)
+        chapterRepository.delete(chapter);
+        log.info("Xóa chapter thành công: storyId={}, chapterNumber={}", storyId, chapterNumber);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public ChapterResponse getChapterDetail(String identifier, Long userId) {
         log.info("Lấy chi tiết chapter: identifier={}, userId={}", identifier, userId);
@@ -122,6 +132,20 @@ public class ChapterServiceImpl implements ChapterService {
             // Nếu không phải số thì tìm theo slug
             chapter = getChapterBySlug(identifier);
         }
+
+        // Kiểm tra quyền xem chapter (nếu cần)
+        validateViewPermissions(chapter, userId);
+
+        return chapterMapper.toChapterResponse(chapter);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ChapterResponse getChapterDetailByStoryAndNumber(Long storyId, Integer chapterNumber, Long userId) {
+        log.info("Lấy chi tiết chapter theo story và number: storyId={}, chapterNumber={}, userId={}",
+                storyId, chapterNumber, userId);
+
+        Chapter chapter = getChapterByStoryAndNumber(storyId, chapterNumber);
 
         // Kiểm tra quyền xem chapter (nếu cần)
         validateViewPermissions(chapter, userId);
@@ -220,6 +244,12 @@ public class ChapterServiceImpl implements ChapterService {
     private Chapter getChapterBySlug(String slug) {
         return chapterRepository.findBySlugWithStory(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chapter: " + slug));
+    }
+
+    private Chapter getChapterByStoryAndNumber(Long storyId, Integer chapterNumber) {
+        return chapterRepository.findByStoryIdAndChapterNumber(storyId, chapterNumber)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        String.format("Không tìm thấy chapter %d của story %d", chapterNumber, storyId)));
     }
 
     private boolean validateEditPermissions(Story story, Long userId) {

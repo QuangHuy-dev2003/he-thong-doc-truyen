@@ -37,7 +37,13 @@ public class SecurityConfig {
                         "/api/v1/stories/{identifier}",
                         "/api/v1/stories/filter",
                         "/api/v1/stories/check-slug/{slug}",
-                        "/api/v1/stories/author/{authorId}"
+                        "/api/v1/stories/author/{authorId}",
+                        "/api/v1/stories/{storyIdentifier}/chapters",
+                        "/api/v1/stories/{storyId}/chapters/{chapterNumber}",
+                        "/api/v1/chapters/{slug}",
+                        "/api/v1/chapters/{id}/next",
+                        "/api/v1/chapters/{id}/previous",
+                        "/api/v1/chapters/check-slug/{slug}"
         };
 
         @Bean

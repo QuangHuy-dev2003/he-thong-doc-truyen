@@ -14,9 +14,10 @@ public interface ChapterService {
     ChapterResponse createChapter(CreateChapterRequest request, Long userId);
 
     /**
-     * Cập nhật chapter
+     * Cập nhật chapter theo storyId và chapterNumber
      */
-    ChapterResponse updateChapter(Long chapterId, UpdateChapterRequest request, Long userId);
+    ChapterResponse updateChapterByStoryAndNumber(Long storyId, Integer chapterNumber, UpdateChapterRequest request,
+            Long userId);
 
     /**
      * Xóa chapter
@@ -24,9 +25,19 @@ public interface ChapterService {
     void deleteChapter(Long chapterId, Long userId);
 
     /**
+     * Xóa chapter theo storyId và chapterNumber
+     */
+    void deleteChapterByStoryAndNumber(Long storyId, Integer chapterNumber, Long userId);
+
+    /**
      * Lấy chi tiết chapter theo ID hoặc slug
      */
     ChapterResponse getChapterDetail(String identifier, Long userId);
+
+    /**
+     * Lấy chi tiết chapter theo storyId và chapterNumber
+     */
+    ChapterResponse getChapterDetailByStoryAndNumber(Long storyId, Integer chapterNumber, Long userId);
 
     /**
      * Lấy danh sách chapter của truyện
