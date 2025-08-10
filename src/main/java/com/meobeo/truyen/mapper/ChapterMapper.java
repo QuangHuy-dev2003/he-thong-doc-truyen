@@ -37,8 +37,8 @@ public class ChapterMapper {
             response.setStorySlug(chapter.getStory().getSlug());
         }
 
-        // Navigation - lấy chapter trước và sau
-        setNavigationInfo(response, chapter);
+        // Navigation - lấy chapter trước và sau (chỉ khi cần thiết)
+        // setNavigationInfo(response, chapter);
 
         // Thông tin trạng thái - TODO: implement logic kiểm tra locked/purchased
         response.setIsLocked(false);
@@ -68,6 +68,18 @@ public class ChapterMapper {
         summary.setIsPurchased(true);
 
         return summary;
+    }
+
+    /**
+     * Convert Chapter entity thành ChapterResponse với navigation info
+     */
+    @Transactional(readOnly = true)
+    public ChapterResponse toChapterResponseWithNavigation(Chapter chapter) {
+        ChapterResponse response = toChapterResponse(chapter);
+        if (response != null && chapter != null) {
+            setNavigationInfo(response, chapter);
+        }
+        return response;
     }
 
     private void setNavigationInfo(ChapterResponse response, Chapter chapter) {

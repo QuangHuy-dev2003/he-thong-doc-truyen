@@ -21,6 +21,11 @@ configurations {
 
 repositories {
 	mavenCentral()
+	
+	// Repository for EPubLib
+	maven {
+		url = uri("https://raw.githubusercontent.com/psiegman/mvn-repo/master/releases/")
+	}
 }
 
 dependencies {
@@ -50,6 +55,15 @@ dependencies {
 	implementation("com.google.api-client:google-api-client:2.2.0")
 	implementation("com.google.oauth-client:google-oauth-client:1.34.1")
 	implementation("com.google.http-client:google-http-client-gson:1.43.3")
+	
+	// EPUB processing library
+	implementation("nl.siegmann.epublib:epublib-core:3.1") {
+		exclude(group = "org.slf4j", module = "slf4j-simple")
+		exclude(group = "commons-logging", module = "commons-logging")
+	}
+	
+	// HTML parser for EPUB content
+	implementation("org.jsoup:jsoup:1.17.2")
 }
 
 tasks.withType<Test> {

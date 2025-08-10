@@ -158,12 +158,30 @@ public class ChapterController {
 
         log.info("API lấy chapter tiếp theo được gọi: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        ChapterResponse nextChapter = chapterService.getNextChapterByStoryAndNumber(storyId, chapterNumber);
+        try {
+            // Validation
+            if (storyId == null || storyId <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Story ID không hợp lệ"));
+            }
 
-        if (nextChapter != null) {
-            return ResponseEntity.ok(ApiResponse.success("Lấy chapter tiếp theo thành công", nextChapter));
-        } else {
-            return ResponseEntity.ok(ApiResponse.success("Đã là chapter cuối cùng", null));
+            if (chapterNumber == null || chapterNumber <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Chapter number không hợp lệ"));
+            }
+
+            ChapterResponse nextChapter = chapterService.getNextChapterByStoryAndNumber(storyId, chapterNumber);
+
+            if (nextChapter != null) {
+                return ResponseEntity.ok(ApiResponse.success("Lấy chapter tiếp theo thành công", nextChapter));
+            } else {
+                return ResponseEntity.ok(ApiResponse.success("Đã là chapter cuối cùng", null));
+            }
+        } catch (Exception e) {
+            log.error("Lỗi lấy chapter tiếp theo: storyId={}, chapterNumber={}, error={}",
+                    storyId, chapterNumber, e.getMessage(), e);
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Lỗi lấy chapter tiếp theo: " + e.getMessage()));
         }
     }
 
@@ -178,12 +196,30 @@ public class ChapterController {
 
         log.info("API lấy chapter trước đó được gọi: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        ChapterResponse previousChapter = chapterService.getPreviousChapterByStoryAndNumber(storyId, chapterNumber);
+        try {
+            // Validation
+            if (storyId == null || storyId <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Story ID không hợp lệ"));
+            }
 
-        if (previousChapter != null) {
-            return ResponseEntity.ok(ApiResponse.success("Lấy chapter trước đó thành công", previousChapter));
-        } else {
-            return ResponseEntity.ok(ApiResponse.success("Đây là chapter đầu tiên", null));
+            if (chapterNumber == null || chapterNumber <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Chapter number không hợp lệ"));
+            }
+
+            ChapterResponse previousChapter = chapterService.getPreviousChapterByStoryAndNumber(storyId, chapterNumber);
+
+            if (previousChapter != null) {
+                return ResponseEntity.ok(ApiResponse.success("Lấy chapter trước đó thành công", previousChapter));
+            } else {
+                return ResponseEntity.ok(ApiResponse.success("Đây là chapter đầu tiên", null));
+            }
+        } catch (Exception e) {
+            log.error("Lỗi lấy chapter trước đó: storyId={}, chapterNumber={}, error={}",
+                    storyId, chapterNumber, e.getMessage(), e);
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Lỗi lấy chapter trước đó: " + e.getMessage()));
         }
     }
 

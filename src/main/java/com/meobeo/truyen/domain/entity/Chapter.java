@@ -11,7 +11,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "chapters")
+@Table(name = "chapters", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "story_id", "chapter_number" })
+}, indexes = {
+        @Index(name = "idx_chapters_story_chapter", columnList = "story_id, chapter_number"),
+        @Index(name = "idx_chapters_slug", columnList = "slug")
+})
 @Data
 @EqualsAndHashCode(exclude = { "story", "unlocks", "readingHistory", "comments", "payment", "vipDiscounts" })
 @ToString(exclude = { "story", "unlocks", "readingHistory", "comments", "payment", "vipDiscounts" })
@@ -24,10 +29,10 @@ public class Chapter {
     @Column(name = "chapter_number", nullable = false)
     private Integer chapterNumber;
 
-    @Column(name = "slug", unique = true, nullable = false)
+    @Column(name = "slug", unique = true, nullable = false, length = 500)
     private String slug;
 
-    @Column(name = "title")
+    @Column(name = "title", length = 1000)
     private String title;
 
     @Column(name = "content", columnDefinition = "TEXT")

@@ -67,15 +67,31 @@ public interface ChapterRepository extends JpaRepository<Chapter, Long> {
          * Lấy chapter tiếp theo trong truyện
          */
         @Query("SELECT c FROM Chapter c WHERE c.story.id = :storyId AND c.chapterNumber > :currentChapterNumber ORDER BY c.chapterNumber ASC")
-        Optional<Chapter> findNextChapter(@Param("storyId") Long storyId,
+        List<Chapter> findNextChapters(@Param("storyId") Long storyId,
                         @Param("currentChapterNumber") Integer currentChapterNumber);
 
         /**
          * Lấy chapter trước đó trong truyện
          */
         @Query("SELECT c FROM Chapter c WHERE c.story.id = :storyId AND c.chapterNumber < :currentChapterNumber ORDER BY c.chapterNumber DESC")
-        Optional<Chapter> findPreviousChapter(@Param("storyId") Long storyId,
+        List<Chapter> findPreviousChapters(@Param("storyId") Long storyId,
                         @Param("currentChapterNumber") Integer currentChapterNumber);
+
+        /**
+         * Lấy chapter tiếp theo trong truyện (chỉ 1 kết quả)
+         */
+        default Optional<Chapter> findNextChapter(Long storyId, Integer currentChapterNumber) {
+                List<Chapter> chapters = findNextChapters(storyId, currentChapterNumber);
+                return chapters.isEmpty() ? Optional.empty() : Optional.of(chapters.get(0));
+        }
+
+        /**
+         * Lấy chapter trước đó trong truyện (chỉ 1 kết quả)
+         */
+        default Optional<Chapter> findPreviousChapter(Long storyId, Integer currentChapterNumber) {
+                List<Chapter> chapters = findPreviousChapters(storyId, currentChapterNumber);
+                return chapters.isEmpty() ? Optional.empty() : Optional.of(chapters.get(0));
+        }
 
         /**
          * Đếm số chapter của truyện
