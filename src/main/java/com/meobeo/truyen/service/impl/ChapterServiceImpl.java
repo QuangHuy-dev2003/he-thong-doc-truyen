@@ -196,7 +196,10 @@ public class ChapterServiceImpl implements ChapterService {
         log.info("Lấy chapter tiếp theo: chapterId={}", chapterId);
 
         Chapter currentChapter = getChapterById(chapterId);
-        return chapterRepository.findNextChapter(currentChapter.getStory().getId(), currentChapter.getChapterNumber())
+        Integer nextNumber = currentChapter.getChapterNumber() + 1;
+
+        return chapterRepository
+                .findByStoryIdAndChapterNumber(currentChapter.getStory().getId(), nextNumber)
                 .map(chapterMapper::toChapterResponse)
                 .orElse(null);
     }
@@ -207,8 +210,12 @@ public class ChapterServiceImpl implements ChapterService {
         log.info("Lấy chapter trước đó: chapterId={}", chapterId);
 
         Chapter currentChapter = getChapterById(chapterId);
+        Integer prevNumber = currentChapter.getChapterNumber() - 1;
+        if (prevNumber <= 0)
+            return null;
+
         return chapterRepository
-                .findPreviousChapter(currentChapter.getStory().getId(), currentChapter.getChapterNumber())
+                .findByStoryIdAndChapterNumber(currentChapter.getStory().getId(), prevNumber)
                 .map(chapterMapper::toChapterResponse)
                 .orElse(null);
     }
@@ -218,7 +225,9 @@ public class ChapterServiceImpl implements ChapterService {
     public ChapterResponse getNextChapterByStoryAndNumber(Long storyId, Integer chapterNumber) {
         log.info("Lấy chapter tiếp theo theo story và number: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        return chapterRepository.findNextChapter(storyId, chapterNumber)
+        Integer nextNumber = chapterNumber + 1;
+        return chapterRepository
+                .findByStoryIdAndChapterNumber(storyId, nextNumber)
                 .map(chapterMapper::toChapterResponse)
                 .orElse(null);
     }
@@ -228,7 +237,12 @@ public class ChapterServiceImpl implements ChapterService {
     public ChapterResponse getPreviousChapterByStoryAndNumber(Long storyId, Integer chapterNumber) {
         log.info("Lấy chapter trước đó theo story và number: storyId={}, chapterNumber={}", storyId, chapterNumber);
 
-        return chapterRepository.findPreviousChapter(storyId, chapterNumber)
+        Integer prevNumber = chapterNumber - 1;
+        if (prevNumber <= 0)
+            return null;
+
+        return chapterRepository
+                .findByStoryIdAndChapterNumber(storyId, prevNumber)
                 .map(chapterMapper::toChapterResponse)
                 .orElse(null);
     }

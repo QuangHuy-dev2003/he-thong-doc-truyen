@@ -36,4 +36,19 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "formatFileExecutor")
+    public Executor formatFileExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        // Thread pool riêng cho format file với ít thread hơn vì format nhẹ hơn import
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("FormatFile-");
+        // Cho phép thread cũ bị terminate để tạo thread mới
+        executor.setAllowCoreThreadTimeOut(true);
+        executor.setKeepAliveSeconds(300);
+        executor.initialize();
+        return executor;
+    }
 }
