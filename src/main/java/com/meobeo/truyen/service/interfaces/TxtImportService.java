@@ -4,6 +4,7 @@ import com.meobeo.truyen.domain.request.story.TxtImportRequest;
 import com.meobeo.truyen.domain.response.story.TxtImportResponse;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface TxtImportService {
@@ -27,6 +28,14 @@ public interface TxtImportService {
     Optional<TxtImportResponse> getImportStatus(String jobId);
 
     /**
+     * Lấy danh sách job import của user
+     * 
+     * @param userId ID người dùng
+     * @return Danh sách job
+     */
+    List<TxtImportResponse> getUserJobs(Long userId);
+
+    /**
      * Hủy import job
      * 
      * @param jobId  Job ID
@@ -41,4 +50,5 @@ public interface TxtImportService {
      * @param jobId Job ID
      */
     void cleanupCompletedJob(String jobId);
+
 }

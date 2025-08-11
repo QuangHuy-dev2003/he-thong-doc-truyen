@@ -21,4 +21,19 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "txtImportExecutor")
+    public Executor txtImportExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        // Thread pool riêng cho import TXT với nhiều thread hơn
+        executor.setCorePoolSize(8);
+        executor.setMaxPoolSize(16);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("TxtImport-");
+        // Cho phép thread cũ bị terminate để tạo thread mới
+        executor.setAllowCoreThreadTimeOut(true);
+        executor.setKeepAliveSeconds(300);
+        executor.initialize();
+        return executor;
+    }
 }

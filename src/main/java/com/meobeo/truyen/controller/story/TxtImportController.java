@@ -7,15 +7,23 @@ import com.meobeo.truyen.exception.ResourceNotFoundException;
 import com.meobeo.truyen.service.interfaces.TxtImportService;
 import com.meobeo.truyen.utils.ApiResponse;
 import com.meobeo.truyen.utils.SecurityUtils;
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import javax.sql.DataSource;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -25,10 +33,12 @@ public class TxtImportController {
 
     private final TxtImportService txtImportService;
     private final SecurityUtils securityUtils;
+    private DataSource dataSource;
 
     /**
-     * API upload và import file TXT
+     * API upload và import file TXT bất đồng bộ
      * Chỉ cho phép UPLOADER và ADMIN
+     * Trả về jobId ngay lập tức để theo dõi tiến độ
      */
     @PostMapping(value = "/stories/txt/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('UPLOADER') or hasRole('ADMIN')")
@@ -78,19 +88,21 @@ public class TxtImportController {
             // Lấy user ID
             Long userId = securityUtils.getCurrentUserIdOrThrow();
 
-            // Bắt đầu import
+            // Bắt đầu import bất đồng bộ - trả về jobId ngay lập tức
             String jobId = txtImportService.startTxtImport(file, request, userId);
 
-            log.info("Bắt đầu import TXT: file={}, jobId={}, userId={}",
+            log.info("Đã khởi tạo job import TXT: file={}, jobId={}, userId={}",
                     file.getOriginalFilename(), jobId, userId);
 
             return ResponseEntity
-                    .ok(ApiResponse.success("Đã bắt đầu import TXT. Sử dụng job ID để theo dõi tiến độ.", jobId));
+                    .ok(ApiResponse.success(
+                            "Đã bắt đầu import TXT bất đồng bộ. Sử dụng job ID để theo dõi tiến độ.",
+                            jobId));
 
         } catch (Exception e) {
-            log.error("Lỗi import TXT: {}", e.getMessage(), e);
+            log.error("Lỗi khởi tạo import TXT: {}", e.getMessage(), e);
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Lỗi import TXT: " + e.getMessage()));
+                    .body(ApiResponse.error("Lỗi khởi tạo import TXT: " + e.getMessage()));
         }
     }
 
@@ -141,6 +153,27 @@ public class TxtImportController {
     }
 
     /**
+     * API lấy danh sách job import của user hiện tại
+     */
+    @GetMapping("/txt/jobs")
+    @PreAuthorize("hasRole('USER') or hasRole('UPLOADER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<TxtImportResponse>>> getUserJobs() {
+
+        try {
+            Long userId = securityUtils.getCurrentUserIdOrThrow();
+            List<TxtImportResponse> userJobs = txtImportService.getUserJobs(userId);
+
+            return ResponseEntity.ok(ApiResponse.success("Lấy danh sách job thành công", userJobs));
+
+        } catch (Exception e) {
+            log.error("Lỗi lấy danh sách job: userId={}, error={}",
+                    securityUtils.getCurrentUserIdOrThrow(), e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Lỗi lấy danh sách job: " + e.getMessage()));
+        }
+    }
+
+    /**
      * API xóa job đã hoàn thành (cleanup)
      */
     @DeleteMapping("/txt/cleanup/{jobId}")
@@ -160,6 +193,24 @@ public class TxtImportController {
         }
     }
 
+    @GetMapping("/txt/db-status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getDatabaseStatus() {
+        Map<String, Object> status = new HashMap<>();
+
+        if (dataSource instanceof HikariDataSource) {
+            HikariDataSource hikariDataSource = (HikariDataSource) dataSource;
+            HikariPoolMXBean poolMXBean = hikariDataSource.getHikariPoolMXBean();
+
+            status.put("activeConnections", poolMXBean.getActiveConnections());
+            status.put("idleConnections", poolMXBean.getIdleConnections());
+            status.put("totalConnections", poolMXBean.getTotalConnections());
+            status.put("threadsAwaitingConnection", poolMXBean.getThreadsAwaitingConnection());
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("Database status", status));
+    }
+
     /**
      * API lấy thông tin hỗ trợ import TXT
      */
@@ -175,6 +226,9 @@ public class TxtImportController {
         info.notes = new String[] {
                 "Truyện phải được tạo trước khi import chapter từ TXT",
                 "Chỉ ADMIN và UPLOADER có quyền import",
+                "Hệ thống xử lý bất đồng bộ - trả về jobId ngay lập tức",
+                "Sử dụng API /txt/status/{jobId} để theo dõi tiến độ real-time",
+                "Sử dụng API /txt/jobs để xem danh sách job của bạn",
                 "Hệ thống tự động phân tích và phát hiện chương theo định dạng 'Chương X: Title'",
                 "Xử lý file theo stream - chỉ đọc và xử lý chương trong range yêu cầu",
                 "Tối ưu memory cho file lớn (hỗ trợ file 2000+ chương)",
@@ -182,7 +236,9 @@ public class TxtImportController {
                 "Batch size càng lớn thì import càng nhanh nhưng tốn RAM hơn",
                 "Có thể theo dõi tiến độ real-time qua API status",
                 "Hỗ trợ overwrite chapter đã tồn tại",
-                "Tự động tạo slug từ title của chương"
+                "Tự động tạo slug từ title của chương",
+                "Có thể hủy job đang chạy qua API /txt/cancel/{jobId}",
+                "Job hoàn thành sẽ tự động cleanup sau 24 giờ"
         };
 
         return ResponseEntity.ok(ApiResponse.success("Thông tin import TXT", info));
