@@ -52,6 +52,8 @@ public class SecurityConfig {
                         "/api/v1/chapters/{chapterId}/comments/count",
                         "/api/v1/chapters/check-slug/{slug}",
                         "/api/v1/chapters/{chapterId}/payment",
+                        "/api/v1/favorites/story/1/count",
+                        "/api/v1/favorites/user/{userId}"
         };
 
         @Bean
