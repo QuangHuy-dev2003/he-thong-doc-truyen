@@ -19,6 +19,9 @@ public class UserWallet {
     @Column(name = "balance")
     private Integer balance = 0;
 
+    @Column(name = "spirit_stones")
+    private Integer spiritStones = 0;
+
     // Quan hệ với User - One-to-One
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
