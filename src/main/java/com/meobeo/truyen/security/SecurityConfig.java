@@ -56,7 +56,9 @@ public class SecurityConfig {
                         "/api/v1/favorites/user/{userId}",
                         "/api/v1/subscriptions/user/{userId}",
                         "/api/v1/subscriptions/story/{storyId}/count",
-                        "/api/v1/reading-history/story/{storyId}/count"
+                        "/api/v1/reading-history/story/{storyId}/count",
+                        "/api/v1/topup-packages/all",
+                        "/api/v1/topup-packages/get/{id}"
         };
 
         @Bean

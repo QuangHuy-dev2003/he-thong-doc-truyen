@@ -169,9 +169,9 @@ public class StoryServiceImpl implements StoryService {
         // Kiểm tra quyền xem (nếu truyện bị ẩn)
         validateViewPermissions(story, userId);
 
-        // Tăng view theo ngày khi người dùng truy cập chi tiết truyện
+        // Tăng view bất đồng bộ để tránh conflict với read-only transaction
         try {
-            storyViewsService.increaseView(story.getId());
+            storyViewsService.increaseViewAsync(story.getId());
         } catch (Exception e) {
             log.warn("Không thể tăng views cho story {}: {}", story.getId(), e.getMessage());
         }

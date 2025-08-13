@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,6 +74,12 @@ public class StoryViewsServiceImpl implements StoryViewsService {
         } catch (Exception e) {
             log.error("Lỗi khi tăng view cho story {}: {}", storyId, e.getMessage(), e);
         }
+    }
+
+    @Override
+    @Async("taskExecutor")
+    public void increaseViewAsync(Long storyId) {
+        increaseView(storyId);
     }
 
     @Override

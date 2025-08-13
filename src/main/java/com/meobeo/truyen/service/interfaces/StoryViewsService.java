@@ -13,6 +13,11 @@ public interface StoryViewsService {
     void increaseView(Long storyId);
 
     /**
+     * Tăng view bất đồng bộ để tránh conflict với read-only transaction
+     */
+    void increaseViewAsync(Long storyId);
+
+    /**
      * Lấy analytics theo ngày với cache
      */
     AnalyticsSeriesResponse getDailyViews(Long storyId, LocalDate start, LocalDate end);
