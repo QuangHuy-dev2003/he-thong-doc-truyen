@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Table(name = "reading_history")
 @Data
 @EqualsAndHashCode(callSuper = false)
-@ToString(exclude = { "user", "chapter" })
+@ToString(exclude = { "user", "chapter", "story" })
 public class ReadingHistory {
 
     @EmbeddedId
@@ -23,10 +23,17 @@ public class ReadingHistory {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @Column(name = "chapter_id", nullable = false)
+    private Long chapterId;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("chapterId")
-    @JoinColumn(name = "chapter_id")
+    @JoinColumn(name = "chapter_id", insertable = false, updatable = false)
     private Chapter chapter;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("storyId")
+    @JoinColumn(name = "story_id")
+    private Story story;
 
     @CreationTimestamp
     @Column(name = "last_read_at")

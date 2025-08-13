@@ -78,4 +78,8 @@ public class Story {
     // Quan hệ với ChapterPayment - One-to-Many
     @OneToMany(mappedBy = "story", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private Set<ChapterPayment> chapterPayments = new HashSet<>();
+
+    // Quan hệ với ReadingHistory - One-to-Many
+    @OneToMany(mappedBy = "story", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private Set<ReadingHistory> readingHistory = new HashSet<>();
 }

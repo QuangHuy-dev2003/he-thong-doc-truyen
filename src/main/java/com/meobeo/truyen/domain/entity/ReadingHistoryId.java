@@ -12,5 +12,5 @@ import java.io.Serializable;
 public class ReadingHistoryId implements Serializable {
 
     private Long userId;
-    private Long chapterId;
+    private Long storyId;
 }
