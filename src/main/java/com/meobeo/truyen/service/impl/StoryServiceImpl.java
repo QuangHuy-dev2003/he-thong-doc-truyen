@@ -10,6 +10,7 @@ import com.meobeo.truyen.exception.ResourceNotFoundException;
 import com.meobeo.truyen.repository.*;
 import com.meobeo.truyen.service.interfaces.AsyncCloudinaryService;
 import com.meobeo.truyen.service.interfaces.CloudinaryService;
+import com.meobeo.truyen.service.interfaces.StoryViewsService;
 import com.meobeo.truyen.service.interfaces.StoryService;
 import com.meobeo.truyen.utils.SecurityUtils;
 import com.meobeo.truyen.mapper.StoryMapper;
@@ -38,6 +39,7 @@ public class StoryServiceImpl implements StoryService {
     private final AsyncCloudinaryService asyncCloudinaryService;
     private final SecurityUtils securityUtils;
     private final StoryMapper storyMapper;
+    private final StoryViewsService storyViewsService;
 
     @Override
     public StoryResponse createStory(CreateStoryRequest request, Long authorId) {
@@ -166,6 +168,13 @@ public class StoryServiceImpl implements StoryService {
 
         // Kiểm tra quyền xem (nếu truyện bị ẩn)
         validateViewPermissions(story, userId);
+
+        // Tăng view theo ngày khi người dùng truy cập chi tiết truyện
+        try {
+            storyViewsService.increaseView(story.getId());
+        } catch (Exception e) {
+            log.warn("Không thể tăng views cho story {}: {}", story.getId(), e.getMessage());
+        }
 
         return storyMapper.toStoryResponse(story);
     }
