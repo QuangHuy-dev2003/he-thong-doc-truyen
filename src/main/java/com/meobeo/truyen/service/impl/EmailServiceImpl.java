@@ -29,6 +29,9 @@ public class EmailServiceImpl implements EmailService {
     @Value("${sendgrid.template.forgot-password}")
     private String forgotPasswordTemplateId;
 
+    @Value("${sendgrid.template.topup-success}")
+    private String topupSuccessTemplateId;
+
     @Override
     public void sendOtpEmail(String toEmail, String otpCode) {
         log.info("Bắt đầu gửi email OTP đến: {}", toEmail);
@@ -111,6 +114,55 @@ public class EmailServiceImpl implements EmailService {
         } catch (Exception e) {
             String errorMessage = String.format("Lỗi không xác định khi gửi email: %s", e.getMessage());
             log.error("Lỗi gửi email quên mật khẩu đến {}: {}", toEmail, errorMessage);
+            throw new RuntimeException(errorMessage, e);
+        }
+    }
+
+    @Override
+    public void sendTopupSuccessEmail(String toEmail, String userName, String packageName,
+            String amount, String newBalance, String time, String walletUrl) {
+        log.info("Bắt đầu gửi email thông báo nạp tiền thành công đến: {}", toEmail);
+
+        try {
+            Mail mail = new Mail();
+            mail.setFrom(new Email("noreply.meobeo@gmail.com", "Tiệm Truyện Mèo Béo"));
+
+            mail.setTemplateId(topupSuccessTemplateId);
+
+            Personalization personalization = new Personalization();
+            personalization.addTo(new Email(toEmail));
+            personalization.addDynamicTemplateData("userName", userName);
+            personalization.addDynamicTemplateData("packageName", packageName);
+            personalization.addDynamicTemplateData("amount", amount);
+            personalization.addDynamicTemplateData("newBalance", newBalance);
+            personalization.addDynamicTemplateData("time", time);
+            personalization.addDynamicTemplateData("walletUrl", walletUrl);
+
+            mail.addPersonalization(personalization);
+
+            Request request = new Request();
+            request.setMethod(Method.POST);
+            request.setEndpoint("mail/send");
+            request.setBody(mail.build());
+
+            Response response = sendGrid.api(request);
+
+            if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
+                log.info("Gửi email thông báo nạp tiền thành công đến: {}", toEmail);
+            } else {
+                String errorMessage = String.format("SendGrid API trả về lỗi. Status: %d, Body: %s",
+                        response.getStatusCode(), response.getBody());
+                log.error("Lỗi gửi email thông báo nạp tiền thành công đến {}: {}", toEmail, errorMessage);
+                throw new RuntimeException(errorMessage);
+            }
+
+        } catch (IOException e) {
+            String errorMessage = String.format("Lỗi kết nối SendGrid: %s", e.getMessage());
+            log.error("Lỗi gửi email thông báo nạp tiền thành công đến {}: {}", toEmail, errorMessage);
+            throw new RuntimeException(errorMessage, e);
+        } catch (Exception e) {
+            String errorMessage = String.format("Lỗi không xác định khi gửi email: %s", e.getMessage());
+            log.error("Lỗi gửi email thông báo nạp tiền thành công đến {}: {}", toEmail, errorMessage);
             throw new RuntimeException(errorMessage, e);
         }
     }

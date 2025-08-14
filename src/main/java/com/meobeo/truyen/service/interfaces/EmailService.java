@@ -6,4 +6,7 @@ public interface EmailService {
 
     void sendForgotPasswordEmail(String toEmail, String otpCode);
 
+    void sendTopupSuccessEmail(String toEmail, String userName, String packageName,
+            String amount, String newBalance, String time, String walletUrl);
+
 }

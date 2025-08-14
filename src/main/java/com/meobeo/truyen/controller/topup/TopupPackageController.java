@@ -88,15 +88,15 @@ public class TopupPackageController {
     }
 
     /**
-     * Nạp tiền (USER)
+     * Nạp tiền trực tiếp (USER) - Không qua VNPAY
      */
     @PostMapping("/topup/process")
     public ResponseEntity<ApiResponse<Void>> processTopup(
             @Valid @RequestBody TopupRequest request,
             @AuthenticationPrincipal User user) {
-        log.info("User {} nạp tiền với gói ID: {}", user.getId(), request.getPackageId());
+        log.info("User {} nạp tiền trực tiếp với gói ID: {}", user.getId(), request.getPackageId());
 
         topupPackageService.processTopup(request, user);
-        return ResponseEntity.ok(ApiResponse.success("Nạp tiền thành công", null));
+        return ResponseEntity.ok(ApiResponse.success("Nạp tiền trực tiếp thành công", null));
     }
 }

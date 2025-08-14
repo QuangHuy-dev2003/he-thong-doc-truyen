@@ -105,7 +105,7 @@ public class TopupPackageServiceImpl implements TopupPackageService {
     @Override
     @Transactional
     public void processTopup(TopupRequest request, User user) {
-        log.info("Xử lý nạp tiền cho user ID: {} với gói ID: {}", user.getId(), request.getPackageId());
+        log.info("Xử lý nạp tiền trực tiếp cho user ID: {} với gói ID: {}", user.getId(), request.getPackageId());
 
         // Lấy gói nạp tiền
         TopupPackage topupPackage = topupPackageRepository.findByIdAndIsActiveTrue(request.getPackageId())
@@ -141,7 +141,8 @@ public class TopupPackageServiceImpl implements TopupPackageService {
         transaction.setAmount(finalAmountInt);
         transaction.setType(TransactionType.TOPUP);
 
-        String description = "Nạp tiền gói: " + topupPackage.getName() + " (Mệnh giá: " + topupPackage.getAmount()
+        String description = "Nạp tiền trực tiếp gói: " + topupPackage.getName() + " (Mệnh giá: "
+                + topupPackage.getAmount()
                 + " VND)";
         if (discountAmount.compareTo(java.math.BigDecimal.ZERO) > 0) {
             description += " - Giảm giá: " + discountAmount + " VND (Voucher: " + request.getVoucherCode() + ")";
@@ -150,7 +151,7 @@ public class TopupPackageServiceImpl implements TopupPackageService {
         transaction.setUser(user);
         walletTransactionRepository.save(transaction);
 
-        log.info("Nạp tiền thành công cho user ID: {}. Số dư mới: {} VND, Giảm giá: {} VND",
+        log.info("Nạp tiền trực tiếp thành công cho user ID: {}. Số dư mới: {} VND, Giảm giá: {} VND",
                 user.getId(), newBalance, discountAmount);
     }
 

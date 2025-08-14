@@ -37,4 +37,17 @@ public class AsyncEmailServiceImpl implements AsyncEmailService {
             // Không throw exception vì đây là async method
         }
     }
+
+    @Override
+    @Async("taskExecutor")
+    public void sendTopupSuccessEmailAsync(String email, String userName, String packageName,
+            String amount, String newBalance, String time, String walletUrl) {
+        try {
+            emailService.sendTopupSuccessEmail(email, userName, packageName, amount, newBalance, time, walletUrl);
+            log.info("Gửi email thông báo nạp tiền thành công bất đồng bộ thành công đến: {}", email);
+        } catch (Exception e) {
+            log.error("Lỗi gửi email thông báo nạp tiền thành công bất đồng bộ đến {}: {}", email, e.getMessage());
+            // Không throw exception vì đây là async method
+        }
+    }
 }

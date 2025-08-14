@@ -24,6 +24,7 @@ import com.meobeo.truyen.utils.ApiResponse;
 public class SecurityConfig {
 
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final ObjectMapper objectMapper;
 
         // Mảng các endpoint công khai - không cần đăng nhập
         private static final String[] PUBLIC_ENDPOINTS = {
@@ -58,7 +59,8 @@ public class SecurityConfig {
                         "/api/v1/subscriptions/story/{storyId}/count",
                         "/api/v1/reading-history/story/{storyId}/count",
                         "/api/v1/topup-packages/all",
-                        "/api/v1/topup-packages/get/{id}"
+                        "/api/v1/topup-packages/get/{id}",
+                        "/api/v1/vnpay/payment-callback",
         };
 
         @Bean
@@ -95,7 +97,7 @@ public class SecurityConfig {
 
                                 ApiResponse<String> apiResponse = ApiResponse
                                                 .error("Token không hợp lệ hoặc đã hết hạn");
-                                String jsonResponse = new ObjectMapper().writeValueAsString(apiResponse);
+                                String jsonResponse = objectMapper.writeValueAsString(apiResponse);
 
                                 response.getWriter().write(jsonResponse);
                         }
@@ -112,7 +114,7 @@ public class SecurityConfig {
 
                         ApiResponse<String> apiResponse = ApiResponse
                                         .error("Bạn không có quyền truy cập vào tài nguyên này");
-                        String jsonResponse = new ObjectMapper().writeValueAsString(apiResponse);
+                        String jsonResponse = objectMapper.writeValueAsString(apiResponse);
 
                         response.getWriter().write(jsonResponse);
                 };

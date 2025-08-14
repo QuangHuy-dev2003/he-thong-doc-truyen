@@ -38,6 +38,8 @@ dependencies {
 	implementation("io.github.cdimascio:java-dotenv:5.2.2")
 	implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 	implementation("org.mapstruct:mapstruct:1.6.3")
+	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+	implementation("org.apache.commons:commons-lang3:3.12.0")
 	implementation("com.sendgrid:sendgrid-java:4.10.1")
 	implementation("com.cloudinary:cloudinary-http44:1.33.0")
 	implementation("io.jsonwebtoken:jjwt-api:0.11.5")
