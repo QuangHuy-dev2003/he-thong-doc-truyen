@@ -10,12 +10,14 @@ import com.meobeo.truyen.domain.request.topup.TopupRequest;
 import com.meobeo.truyen.domain.request.topup.UpdateTopupPackageRequest;
 import com.meobeo.truyen.domain.response.topup.TopupPackageListResponse;
 import com.meobeo.truyen.domain.response.topup.TopupPackageResponse;
+import com.meobeo.truyen.exception.BadRequestException;
 import com.meobeo.truyen.exception.ResourceNotFoundException;
 import com.meobeo.truyen.mapper.TopupPackageMapper;
 import com.meobeo.truyen.repository.TopupPackageRepository;
 import com.meobeo.truyen.repository.UserWalletRepository;
 import com.meobeo.truyen.repository.WalletTransactionRepository;
 import com.meobeo.truyen.service.TopupPackageService;
+import com.meobeo.truyen.service.interfaces.VoucherService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class TopupPackageServiceImpl implements TopupPackageService {
     private final UserWalletRepository userWalletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final TopupPackageMapper topupPackageMapper;
+    private final VoucherService voucherService;
 
     @Override
     @Transactional
@@ -109,6 +112,15 @@ public class TopupPackageServiceImpl implements TopupPackageService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy gói nạp tiền với ID: " + request.getPackageId()));
 
+        // Tính toán số tiền thực tế sau khi áp dụng voucher
+        java.math.BigDecimal originalAmount = java.math.BigDecimal.valueOf(topupPackage.getAmount());
+        java.math.BigDecimal discountAmount = applyVoucherToTopup(request.getVoucherCode(), originalAmount,
+                user.getId());
+        java.math.BigDecimal finalAmount = originalAmount.subtract(discountAmount);
+
+        // Chuyển đổi về int cho balance (giữ nguyên logic cũ)
+        int finalAmountInt = finalAmount.intValue();
+
         // Lấy hoặc tạo ví của user
         UserWallet userWallet = userWalletRepository.findById(user.getId())
                 .orElseGet(() -> {
@@ -120,19 +132,56 @@ public class TopupPackageServiceImpl implements TopupPackageService {
                 });
 
         // Cập nhật số dư
-        int newBalance = userWallet.getBalance() + topupPackage.getAmount();
+        int newBalance = userWallet.getBalance() + finalAmountInt;
         userWallet.setBalance(newBalance);
         userWalletRepository.save(userWallet);
 
         // Tạo transaction
         WalletTransaction transaction = new WalletTransaction();
-        transaction.setAmount(topupPackage.getAmount());
+        transaction.setAmount(finalAmountInt);
         transaction.setType(TransactionType.TOPUP);
-        transaction.setDescription(
-                "Nạp tiền gói: " + topupPackage.getName() + " (Mệnh giá: " + topupPackage.getAmount() + " VND)");
+
+        String description = "Nạp tiền gói: " + topupPackage.getName() + " (Mệnh giá: " + topupPackage.getAmount()
+                + " VND)";
+        if (discountAmount.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            description += " - Giảm giá: " + discountAmount + " VND (Voucher: " + request.getVoucherCode() + ")";
+        }
+        transaction.setDescription(description);
         transaction.setUser(user);
         walletTransactionRepository.save(transaction);
 
-        log.info("Nạp tiền thành công cho user ID: {}. Số dư mới: {} VND", user.getId(), newBalance);
+        log.info("Nạp tiền thành công cho user ID: {}. Số dư mới: {} VND, Giảm giá: {} VND",
+                user.getId(), newBalance, discountAmount);
+    }
+
+    @Override
+    public java.math.BigDecimal applyVoucherToTopup(String voucherCode, java.math.BigDecimal originalAmount,
+            Long userId) {
+        if (voucherCode == null || voucherCode.trim().isEmpty()) {
+            return java.math.BigDecimal.ZERO;
+        }
+
+        log.info("Áp dụng voucher {} cho topup với số tiền {} cho user {}", voucherCode, originalAmount, userId);
+
+        try {
+            // Kiểm tra voucher có hợp lệ không
+            if (!voucherService.isValidVoucher(voucherCode, userId)) {
+                throw new BadRequestException("Voucher không hợp lệ hoặc đã hết hạn");
+            }
+
+            // Tính toán giảm giá
+            var discountCalculation = voucherService.calculateDiscount(voucherCode, originalAmount);
+
+            if (!discountCalculation.isValid()) {
+                throw new BadRequestException(discountCalculation.getMessage());
+            }
+
+            log.info("Áp dụng voucher thành công. Giảm giá: {} VND", discountCalculation.getDiscountAmount());
+            return discountCalculation.getDiscountAmount();
+
+        } catch (Exception e) {
+            log.error("Lỗi khi áp dụng voucher: {}", e.getMessage());
+            throw new BadRequestException("Không thể áp dụng voucher: " + e.getMessage());
+        }
     }
 }

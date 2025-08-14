@@ -41,4 +41,9 @@ public interface TopupPackageService {
      * Xử lý nạp tiền và tạo transaction (USER)
      */
     void processTopup(TopupRequest request, User user);
+
+    /**
+     * Áp dụng voucher cho topup và tính toán giảm giá
+     */
+    java.math.BigDecimal applyVoucherToTopup(String voucherCode, java.math.BigDecimal originalAmount, Long userId);
 }
