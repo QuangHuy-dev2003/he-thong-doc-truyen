@@ -38,7 +38,7 @@ public class EmailServiceImpl implements EmailService {
 
         try {
             Mail mail = new Mail();
-            mail.setFrom(new Email("noreply.meobeo@gmail.com", "Tiệm Truyện Mèo Béo"));
+            mail.setFrom(new Email("noreply@em5422.tiemtruyenmeobeo.me", "Tiệm Truyện Mèo Béo"));
 
             mail.setTemplateId(otpTemplateId);
 
@@ -81,7 +81,7 @@ public class EmailServiceImpl implements EmailService {
 
         try {
             Mail mail = new Mail();
-            mail.setFrom(new Email("noreply.meobeo@gmail.com", "Tiệm Truyện Mèo Béo"));
+            mail.setFrom(new Email("noreply@em5422.tiemtruyenmeobeo.me", "Tiệm Truyện Mèo Béo"));
 
             mail.setTemplateId(forgotPasswordTemplateId);
 
@@ -125,7 +125,7 @@ public class EmailServiceImpl implements EmailService {
 
         try {
             Mail mail = new Mail();
-            mail.setFrom(new Email("noreply.meobeo@gmail.com", "Tiệm Truyện Mèo Béo"));
+            mail.setFrom(new Email("noreply@em5422.tiemtruyenmeobeo.me", "Tiệm Truyện Mèo Béo"));
 
             mail.setTemplateId(topupSuccessTemplateId);
 

@@ -5,8 +5,12 @@ import com.meobeo.truyen.domain.entity.PaymentTransaction;
 import com.meobeo.truyen.domain.entity.TopupPackage;
 import com.meobeo.truyen.domain.entity.User;
 import com.meobeo.truyen.domain.entity.UserWallet;
+import com.meobeo.truyen.domain.entity.Voucher;
+import com.meobeo.truyen.domain.entity.VoucherUsage;
+import com.meobeo.truyen.domain.entity.VoucherUsageId;
 import com.meobeo.truyen.domain.entity.WalletTransaction;
 import com.meobeo.truyen.domain.enums.TransactionType;
+import com.meobeo.truyen.domain.repository.VoucherUsageRepository;
 import com.meobeo.truyen.domain.request.topup.TopupPaymentRequest;
 import com.meobeo.truyen.domain.response.topup.PaymentHistoryResponse;
 import com.meobeo.truyen.domain.response.topup.PaymentResult;
@@ -57,7 +61,7 @@ public class VnpayServiceImpl implements VnpayService {
     private final VoucherService voucherService;
     private final PaymentTransactionMapper paymentTransactionMapper;
     private final AsyncEmailService asyncEmailService;
-
+    private final VoucherUsageRepository voucherUsageRepository;
     @Value("${app.wallet.url}")
     private String walletUrl;
 
@@ -71,6 +75,29 @@ public class VnpayServiceImpl implements VnpayService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy gói nạp tiền với ID: " + request.getPackageId()));
 
+        // ======= KIỂM TRA VOUCHER TRƯỚC KHI TẠO PAYMENT URL =======
+        if (request.getVoucherCode() != null && !request.getVoucherCode().trim().isEmpty()) {
+            try {
+                // Kiểm tra voucher có hợp lệ không (bao gồm kiểm tra user đã sử dụng chưa)
+                if (!voucherService.isValidVoucher(request.getVoucherCode(), user.getId())) {
+                    throw new BadRequestException("Voucher không hợp lệ hoặc đã hết hạn");
+                }
+
+                // Kiểm tra số tiền tối thiểu
+                BigDecimal originalAmount = BigDecimal.valueOf(topupPackage.getAmount());
+                var discountResponse = voucherService.calculateDiscount(request.getVoucherCode(), originalAmount);
+
+                if (!discountResponse.isValid()) {
+                    throw new BadRequestException(discountResponse.getMessage());
+                }
+
+                log.info("Voucher {} hợp lệ cho user {} với gói {}", request.getVoucherCode(), user.getId(),
+                        topupPackage.getName());
+            } catch (Exception e) {
+                log.error("Lỗi kiểm tra voucher {}: {}", request.getVoucherCode(), e.getMessage());
+                throw new BadRequestException("Không thể áp dụng voucher: " + e.getMessage());
+            }
+        }
         // Tính toán số tiền
         BigDecimal originalAmount = BigDecimal.valueOf(topupPackage.getAmount());
         BigDecimal discountAmount = calculateVoucherDiscount(request.getVoucherCode(), originalAmount, user.getId());
@@ -177,6 +204,18 @@ public class VnpayServiceImpl implements VnpayService {
                 transaction.setStatus(PaymentTransaction.PaymentStatus.SUCCESS);
                 transaction.setPaidAt(LocalDateTime.now());
 
+                // ======= LƯU VOUCHER USAGE KHI THANH TOÁN THÀNH CÔNG =======
+                if (transaction.getVoucherCode() != null && !transaction.getVoucherCode().trim().isEmpty()) {
+                    try {
+                        saveVoucherUsage(transaction.getVoucherCode(), transaction.getOriginalAmount(),
+                                transaction.getDiscountAmount(), transaction.getUser());
+                        log.info("Đã lưu voucher usage cho user {} với voucher {} khi thanh toán thành công",
+                                transaction.getUser().getId(), transaction.getVoucherCode());
+                    } catch (Exception e) {
+                        log.error("Lỗi lưu voucher usage khi thanh toán thành công: {}", e.getMessage());
+                        // Không throw exception vì thanh toán đã thành công, chỉ log lỗi
+                    }
+                }
                 // Cập nhật ví người dùng
                 updateUserWallet(transaction.getUser(), transaction);
 
@@ -211,6 +250,22 @@ public class VnpayServiceImpl implements VnpayService {
         }
 
         return result;
+    }
+
+    // Lưu voucher usage khi thanh toán thành công
+    private void saveVoucherUsage(String voucherCode, BigDecimal originalAmount, BigDecimal discountAmount, User user) {
+        Voucher voucher = voucherService.getVoucherByCode(voucherCode);
+
+        VoucherUsageId usageId = new VoucherUsageId(voucher.getId(), user.getId());
+        VoucherUsage voucherUsage = new VoucherUsage();
+        voucherUsage.setId(usageId);
+        voucherUsage.setVoucher(voucher);
+        voucherUsage.setUser(user);
+        voucherUsage.setDiscountAmount(discountAmount);
+        voucherUsage.setOriginalAmount(originalAmount);
+        voucherUsage.setUsedAt(LocalDateTime.now());
+
+        voucherUsageRepository.save(voucherUsage);
     }
 
     @Override
@@ -293,7 +348,7 @@ public class VnpayServiceImpl implements VnpayService {
                     return userWalletRepository.save(newWallet);
                 });
 
-        int newBalance = userWallet.getBalance() + transaction.getAmount().intValue();
+        int newBalance = userWallet.getBalance() + transaction.getOriginalAmount().intValue();
         userWallet.setBalance(newBalance);
         userWalletRepository.save(userWallet);
 
@@ -306,7 +361,7 @@ public class VnpayServiceImpl implements VnpayService {
         log.info("Tạo lịch sử giao dịch ví cho user: {}", user.getId());
 
         WalletTransaction walletTransaction = new WalletTransaction();
-        walletTransaction.setAmount(transaction.getAmount().intValue());
+        walletTransaction.setAmount(transaction.getOriginalAmount().intValue());
         walletTransaction.setCurrency(WalletTransaction.CurrencyType.VND);
         walletTransaction.setType(TransactionType.TOPUP);
         walletTransaction.setUser(user);
