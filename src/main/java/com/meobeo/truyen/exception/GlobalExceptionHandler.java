@@ -98,6 +98,27 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(PackageNotFoundException.class)
+    public ResponseEntity<ApiResponse<String>> handlePackageNotFoundException(PackageNotFoundException ex) {
+        log.warn("PackageNotFoundException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(PackageInactiveException.class)
+    public ResponseEntity<ApiResponse<String>> handlePackageInactiveException(PackageInactiveException ex) {
+        log.warn("PackageInactiveException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(InsufficientBalanceException.class)
+    public ResponseEntity<ApiResponse<String>> handleInsufficientBalanceException(InsufficientBalanceException ex) {
+        log.warn("InsufficientBalanceException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ApiResponse<String>> handleForbiddenException(ForbiddenException ex) {
         log.warn("ForbiddenException: {}", ex.getMessage());

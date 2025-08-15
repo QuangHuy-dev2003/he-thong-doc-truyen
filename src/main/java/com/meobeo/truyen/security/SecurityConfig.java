@@ -62,6 +62,9 @@ public class SecurityConfig {
                         "/api/v1/topup-packages/get/{id}",
                         "/api/v1/vnpay/payment-callback",
                         "/api/v1/sepay/webhook",
+                        "/api/v1/spirit-stone-packages/all",
+                        "/api/v1/spirit-stone-packages/get/{id}",
+
         };
 
         @Bean

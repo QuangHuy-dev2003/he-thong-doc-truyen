@@ -15,24 +15,32 @@ import java.util.List;
 @Repository
 public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, Long> {
 
-    /**
-     * Lấy lịch sử giao dịch của user theo thời gian
-     */
-    @Query("SELECT wt FROM WalletTransaction wt WHERE wt.user.id = :userId ORDER BY wt.createdAt DESC")
-    Page<WalletTransaction> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId, Pageable pageable);
+        /**
+         * Lấy lịch sử giao dịch của user theo thời gian
+         */
+        @Query("SELECT wt FROM WalletTransaction wt WHERE wt.user.id = :userId ORDER BY wt.createdAt DESC")
+        Page<WalletTransaction> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId, Pageable pageable);
 
-    /**
-     * Lấy lịch sử giao dịch theo loại
-     */
-    @Query("SELECT wt FROM WalletTransaction wt WHERE wt.user.id = :userId AND wt.type = :type ORDER BY wt.createdAt DESC")
-    List<WalletTransaction> findByUserIdAndTypeOrderByCreatedAtDesc(@Param("userId") Long userId,
-            @Param("type") TransactionType type);
+        /**
+         * Lấy lịch sử giao dịch theo loại
+         */
+        @Query("SELECT wt FROM WalletTransaction wt WHERE wt.user.id = :userId AND wt.type = :type ORDER BY wt.createdAt DESC")
+        List<WalletTransaction> findByUserIdAndTypeOrderByCreatedAtDesc(@Param("userId") Long userId,
+                        @Param("type") TransactionType type);
 
-    /**
-     * Lấy lịch sử giao dịch trong khoảng thời gian
-     */
-    @Query("SELECT wt FROM WalletTransaction wt WHERE wt.user.id = :userId AND wt.createdAt BETWEEN :startDate AND :endDate ORDER BY wt.createdAt DESC")
-    List<WalletTransaction> findByUserIdAndCreatedAtBetween(@Param("userId") Long userId,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate);
+        /**
+         * Lấy lịch sử giao dịch trong khoảng thời gian
+         */
+        @Query("SELECT wt FROM WalletTransaction wt WHERE wt.user.id = :userId AND wt.createdAt BETWEEN :startDate AND :endDate ORDER BY wt.createdAt DESC")
+        List<WalletTransaction> findByUserIdAndCreatedAtBetween(@Param("userId") Long userId,
+                        @Param("startDate") LocalDateTime startDate,
+                        @Param("endDate") LocalDateTime endDate);
+
+        /**
+         * Lấy lịch sử giao dịch theo user và danh sách loại giao dịch
+         */
+        @Query("SELECT wt FROM WalletTransaction wt WHERE wt.user = :user AND wt.type IN :types ORDER BY wt.createdAt DESC")
+        Page<WalletTransaction> findByUserAndTypeInOrderByCreatedAtDesc(
+                        @Param("user") com.meobeo.truyen.domain.entity.User user,
+                        @Param("types") List<TransactionType> types, Pageable pageable);
 }
