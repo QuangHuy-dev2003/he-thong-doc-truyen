@@ -60,6 +60,7 @@ public class AdminWalletServiceImpl implements AdminWalletService {
         // Lưu số dư cũ
         Integer oldBalance = wallet.getBalance();
         Integer oldSpiritStones = wallet.getSpiritStones();
+        Integer oldRecommendationTickets = wallet.getRecommendationTickets();
 
         // Thực hiện điều chỉnh
         Integer adjustedAmount = request.getAmount();
@@ -81,6 +82,13 @@ public class AdminWalletServiceImpl implements AdminWalletService {
                         "Số linh thạch không đủ để trừ. Số linh thạch hiện tại: " + wallet.getSpiritStones());
             }
             wallet.setSpiritStones(newSpiritStones);
+        } else if (request.getCurrency() == WalletTransaction.CurrencyType.RECOMMENDATION_TICKET) {
+            int newRecommendationTickets = wallet.getRecommendationTickets() + adjustedAmount;
+            if (newRecommendationTickets < 0) {
+                throw new BadRequestException(
+                        "Số phiếu đề cử không đủ để trừ. Số phiếu hiện tại: " + wallet.getRecommendationTickets());
+            }
+            wallet.setRecommendationTickets(newRecommendationTickets);
         }
 
         userWalletRepository.save(wallet);
@@ -98,7 +106,9 @@ public class AdminWalletServiceImpl implements AdminWalletService {
                     adminUsername,
                     request.getAdjustmentType() == AdminWalletAdjustmentRequest.AdjustmentType.ADD ? "Cộng" : "Trừ",
                     request.getAmount(),
-                    request.getCurrency() == WalletTransaction.CurrencyType.VND ? "VND" : "Linh thạch");
+                    request.getCurrency() == WalletTransaction.CurrencyType.VND ? "VND"
+                            : request.getCurrency() == WalletTransaction.CurrencyType.SPIRIT_STONE ? "Linh thạch"
+                                    : "Phiếu đề cử");
         } else {
             description = String.format("Điều chỉnh bởi ADMIN %s: %s", adminUsername, description);
         }
@@ -115,6 +125,8 @@ public class AdminWalletServiceImpl implements AdminWalletService {
         response.setNewBalance(wallet.getBalance());
         response.setOldSpiritStones(oldSpiritStones);
         response.setNewSpiritStones(wallet.getSpiritStones());
+        response.setOldRecommendationTickets(oldRecommendationTickets);
+        response.setNewRecommendationTickets(wallet.getRecommendationTickets());
         response.setAdjustedAmount(adjustedAmount);
         response.setCurrency(request.getCurrency().name());
         response.setAdjustmentType(request.getAdjustmentType().name());
@@ -153,6 +165,7 @@ public class AdminWalletServiceImpl implements AdminWalletService {
         response.setEmail(user.getEmail());
         response.setBalance(wallet.getBalance());
         response.setSpiritStones(wallet.getSpiritStones());
+        response.setRecommendationTickets(wallet.getRecommendationTickets());
         response.setCreatedAt(user.getCreatedAt());
 
         // Lấy thời gian giao dịch cuối cùng

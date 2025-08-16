@@ -45,6 +45,7 @@ public class WalletTransaction {
 
     public enum CurrencyType {
         VND,
-        SPIRIT_STONE
+        SPIRIT_STONE,
+        RECOMMENDATION_TICKET
     }
 }

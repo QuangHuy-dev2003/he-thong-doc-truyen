@@ -9,5 +9,6 @@ public class WalletBalanceResponse {
     private Integer spiritStones; // Số linh thạch
     private Integer amountSpent; // Số tiền đã chi
     private Integer spiritStonesReceived; // Số linh thạch đã nhận
+    private Integer recommendationTicketsEarned; // Số phiếu đề cử được tặng
     private String description; // Mô tả giao dịch
 }

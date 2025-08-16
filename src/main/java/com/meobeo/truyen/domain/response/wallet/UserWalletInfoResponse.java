@@ -13,6 +13,7 @@ public class UserWalletInfoResponse {
     private String email;
     private Integer balance; // Số dư tiền mặt (VND)
     private Integer spiritStones; // Số linh thạch
+    private Integer recommendationTickets; // Số phiếu đề cử
     private LocalDateTime lastTransactionAt;
     private LocalDateTime createdAt;
 }

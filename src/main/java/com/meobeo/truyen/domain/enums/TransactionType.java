@@ -7,5 +7,7 @@ public enum TransactionType {
     SPIRIT_EARN, // Kiếm linh thạch (đọc truyện, hoạt động)
     SPIRIT_SPEND, // Tiêu linh thạch (mua chapter)
     SPIRIT_EXCHANGE, // Đổi linh thạch (VND -> Linh thạch)
-    ADMIN_ADJUSTMENT // Điều chỉnh bởi ADMIN
+    ADMIN_ADJUSTMENT, // Điều chỉnh bởi ADMIN
+    RECOMMENDATION_TICKET_EARN, // Kiếm phiếu đề cử
+    RECOMMENDATION_TICKET_SPEND // Tiêu phiếu đề cử
 }

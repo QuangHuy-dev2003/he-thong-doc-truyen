@@ -117,4 +117,16 @@ public class StoryMapper {
         response.setIsLocked(false);
         return response;
     }
+
+    /**
+     * Chuyển đổi danh sách Story thành danh sách StoryResponse
+     */
+    public List<StoryResponse> toResponseList(List<Story> stories) {
+        if (stories == null) {
+            return null;
+        }
+        return stories.stream()
+                .map(this::toStoryResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
 }

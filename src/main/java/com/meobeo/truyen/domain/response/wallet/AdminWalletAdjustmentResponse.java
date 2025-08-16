@@ -14,6 +14,8 @@ public class AdminWalletAdjustmentResponse {
     private Integer newBalance;
     private Integer oldSpiritStones;
     private Integer newSpiritStones;
+    private Integer oldRecommendationTickets;
+    private Integer newRecommendationTickets;
     private Integer adjustedAmount;
     private String currency;
     private String adjustmentType;

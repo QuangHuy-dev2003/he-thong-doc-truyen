@@ -44,6 +44,8 @@ public class SpiritStonePackageServiceImpl implements SpiritStonePackageService 
 
         // Tỷ giá cố định: 50 VND = 1 linh thạch
         private static final double EXCHANGE_RATE = 50.0;
+        // Tặng 1 phiếu đề cử khi đổi 100 linh thạch
+        private static final int RECOMMENDATION_TICKET_THRESHOLD = 100;
 
         @Override
         @Transactional
@@ -143,15 +145,21 @@ public class SpiritStonePackageServiceImpl implements SpiritStonePackageService 
                                         + amountToSpend + " VND, Hiện có: " + userWallet.getBalance() + " VND");
                 }
 
-                // Thực hiện giao dịch
+                // Thực hiện giao dịch và lấy số phiếu đề cử được tặng
                 performExchange(userWallet, userId, amountToSpend, spiritStonesReceived, description);
 
+                // Tính toán số phiếu đề cử được tặng
+                int recommendationTicketsEarned = 0;
+                if (spiritStonesReceived >= RECOMMENDATION_TICKET_THRESHOLD) {
+                        recommendationTicketsEarned = spiritStonesReceived / RECOMMENDATION_TICKET_THRESHOLD;
+                }
                 // Tạo response
                 WalletBalanceResponse response = new WalletBalanceResponse();
                 response.setBalance(userWallet.getBalance());
                 response.setSpiritStones(userWallet.getSpiritStones());
                 response.setAmountSpent(amountToSpend);
                 response.setSpiritStonesReceived(spiritStonesReceived);
+                response.setRecommendationTicketsEarned(recommendationTicketsEarned);
                 response.setDescription(description);
 
                 log.info("Đổi linh thạch theo gói thành công. User ID: {}, Chi: {} VND, Nhận: {} linh thạch",
@@ -187,12 +195,19 @@ public class SpiritStonePackageServiceImpl implements SpiritStonePackageService 
                 // Thực hiện giao dịch
                 performExchange(userWallet, userId, amountToSpend, spiritStonesReceived, description);
 
+                // Tính toán số phiếu đề cử được tặng
+                int recommendationTicketsEarned = 0;
+                if (spiritStonesReceived >= RECOMMENDATION_TICKET_THRESHOLD) {
+                        recommendationTicketsEarned = spiritStonesReceived / RECOMMENDATION_TICKET_THRESHOLD;
+                }
+
                 // Tạo response
                 WalletBalanceResponse response = new WalletBalanceResponse();
                 response.setBalance(userWallet.getBalance());
                 response.setSpiritStones(userWallet.getSpiritStones());
                 response.setAmountSpent(amountToSpend);
                 response.setSpiritStonesReceived(spiritStonesReceived);
+                response.setRecommendationTicketsEarned(recommendationTicketsEarned);
                 response.setDescription(description);
 
                 log.info("Đổi linh thạch theo số tiền thành công. User ID: {}, Chi: {} VND, Nhận: {} linh thạch",
@@ -210,6 +225,15 @@ public class SpiritStonePackageServiceImpl implements SpiritStonePackageService 
                 userWallet.setBalance(userWallet.getBalance() - amountToSpend);
                 // Cộng linh thạch
                 userWallet.setSpiritStones(userWallet.getSpiritStones() + spiritStonesReceived);
+
+                // TÍNH TOÁN VÀ CỘNG PHIẾU ĐỀ CỬ
+                int recommendationTicketsEarned = 0;
+                if (spiritStonesReceived >= RECOMMENDATION_TICKET_THRESHOLD) {
+                        recommendationTicketsEarned = spiritStonesReceived / RECOMMENDATION_TICKET_THRESHOLD;
+                        userWallet.setRecommendationTickets(
+                                        userWallet.getRecommendationTickets() + recommendationTicketsEarned);
+                }
+
                 userWalletRepository.save(userWallet);
 
                 // Tạo User object để lưu transaction
@@ -234,6 +258,18 @@ public class SpiritStonePackageServiceImpl implements SpiritStonePackageService 
                 earnTransaction.setDescription("Nhận linh thạch từ đổi - " + description);
                 earnTransaction.setUser(user);
                 walletTransactionRepository.save(earnTransaction);
+
+                // TẠO GIAO DỊCH PHIẾU ĐỀ CỬ (nếu có)
+                if (recommendationTicketsEarned > 0) {
+                        WalletTransaction ticketTransaction = new WalletTransaction();
+                        ticketTransaction.setAmount(recommendationTicketsEarned);
+                        ticketTransaction.setCurrency(WalletTransaction.CurrencyType.RECOMMENDATION_TICKET);
+                        ticketTransaction.setType(TransactionType.RECOMMENDATION_TICKET_EARN);
+                        ticketTransaction.setDescription("Tặng phiếu đề cử khi đổi linh thạch - " + description);
+                        ticketTransaction.setUser(user);
+                        walletTransactionRepository.save(ticketTransaction);
+                }
+
         }
 
         @Override

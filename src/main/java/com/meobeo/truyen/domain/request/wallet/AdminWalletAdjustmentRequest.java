@@ -12,7 +12,7 @@ public class AdminWalletAdjustmentRequest {
     private Long userId;
 
     @NotNull(message = "Loại tiền tệ không được để trống")
-    private WalletTransaction.CurrencyType currency;
+    private WalletTransaction.CurrencyType currency; // VND, SPIRIT_STONE, RECOMMENDATION_TICKET
 
     @NotNull(message = "Số tiền không được để trống")
     @Positive(message = "Số tiền phải lớn hơn 0")
