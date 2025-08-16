@@ -25,8 +25,8 @@ public class ChapterResponse {
 
     // Thông tin trạng thái và payment
     private Boolean isLocked;
-    private Boolean isPurchased;
-    private Integer price;
+    private Boolean isUnlockedByUser;
+    private Integer unlockPrice;
     private Boolean isVipOnly;
 
     @Data

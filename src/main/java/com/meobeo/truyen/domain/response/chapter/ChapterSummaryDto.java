@@ -15,5 +15,6 @@ public class ChapterSummaryDto {
 
     // Thông tin trạng thái cơ bản
     private Boolean isLocked;
-    private Boolean isPurchased;
+    private Boolean isUnlockedByUser;
+    private Integer unlockPrice;
 }

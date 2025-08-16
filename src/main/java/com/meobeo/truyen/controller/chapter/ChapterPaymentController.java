@@ -5,11 +5,16 @@ import com.meobeo.truyen.domain.request.chapter.ChapterLockRequest;
 import com.meobeo.truyen.domain.response.chapter.ChapterBatchLockResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterPaymentResponse;
 import com.meobeo.truyen.service.interfaces.ChapterPaymentService;
+import com.meobeo.truyen.service.interfaces.AsyncChapterPaymentService;
 import com.meobeo.truyen.utils.ApiResponse;
 import com.meobeo.truyen.utils.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +29,7 @@ import java.util.Optional;
 public class ChapterPaymentController {
 
     private final ChapterPaymentService chapterPaymentService;
+    private final AsyncChapterPaymentService asyncChapterPaymentService;
     private final SecurityUtils securityUtils;
 
     /**
@@ -42,22 +48,6 @@ public class ChapterPaymentController {
         ChapterPaymentResponse response = chapterPaymentService.lockChapter(chapterId, request, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Khóa chapter thành công", response));
-    }
-
-    /**
-     * PUT /api/v1/chapters/{chapterId}/unlock - Mở khóa chapter
-     * Chỉ ADMIN và UPLOADER được phép thực hiện
-     */
-    @PutMapping("/chapters/{chapterId}/unlock")
-    @PreAuthorize("hasRole('UPLOADER') or hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ChapterPaymentResponse>> unlockChapter(@PathVariable Long chapterId) {
-
-        log.info("API mở khóa chapter được gọi: chapterId={}", chapterId);
-
-        Long userId = securityUtils.getCurrentUserIdOrThrow();
-        ChapterPaymentResponse response = chapterPaymentService.unlockChapter(chapterId, userId);
-
-        return ResponseEntity.ok(ApiResponse.success("Mở khóa chapter thành công", response));
     }
 
     /**
@@ -94,18 +84,31 @@ public class ChapterPaymentController {
 
     /**
      * GET /api/v1/stories/{storyId}/chapter-payments - Lấy danh sách payment của
-     * story
+     * story (có phân trang)
+     * Chỉ ADMIN và UPLOADER (author của story) được phép xem
+     */
+    /**
+     * GET /api/v1/stories/{storyId}/chapter-payments - Lấy danh sách payment của
+     * story (có phân trang)
      * Chỉ ADMIN và UPLOADER (author của story) được phép xem
      */
     @GetMapping("/stories/{storyId}/chapter-payments")
     @PreAuthorize("hasRole('UPLOADER') or hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ChapterPaymentResponse>>> getChapterPaymentsByStory(
-            @PathVariable Long storyId) {
+    public ResponseEntity<ApiResponse<Page<ChapterPaymentResponse>>> getChapterPaymentsByStory(
+            @PathVariable Long storyId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        log.info("API lấy danh sách payment theo story được gọi: storyId={}", storyId);
+        log.info("API lấy danh sách payment theo story được gọi: storyId={}, page={}, size={}",
+                storyId, page, size);
+
+        // Luôn sort theo chapter number vì đây là logic nghiệp vụ
+        // Không cho phép sort theo field khác để tránh lỗi
+        Pageable pageable = PageRequest.of(page, size);
 
         Long userId = securityUtils.getCurrentUserIdOrThrow();
-        List<ChapterPaymentResponse> responses = chapterPaymentService.getChapterPaymentsByStory(storyId, userId);
+        Page<ChapterPaymentResponse> responses = chapterPaymentService.getChapterPaymentsByStory(storyId, userId,
+                pageable);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách payment thành công", responses));
     }
@@ -159,7 +162,7 @@ public class ChapterPaymentController {
 
     /**
      * POST /api/v1/chapters/batch/lock-async - Khóa nhiều chapter bất đồng bộ
-     * (50-1000 chapter)
+     * (>= 50 chapter, không giới hạn trên)
      * Trả về jobId để client có thể track progress
      * Chỉ ADMIN và UPLOADER được phép thực hiện
      */
@@ -182,10 +185,6 @@ public class ChapterPaymentController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse
                             .error("Async API dành cho range >= 50 chapter. Dùng /batch/lock cho range nhỏ hơn"));
-        }
-        if (rangeSize > 1000) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Không thể khóa quá 1000 chapter cùng lúc"));
         }
 
         Long userId = securityUtils.getCurrentUserIdOrThrow();

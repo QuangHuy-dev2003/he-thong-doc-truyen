@@ -15,21 +15,22 @@ import com.meobeo.truyen.repository.ChapterPaymentRepository;
 import com.meobeo.truyen.repository.ChapterRepository;
 import com.meobeo.truyen.repository.StoryRepository;
 import com.meobeo.truyen.service.interfaces.ChapterPaymentService;
+import com.meobeo.truyen.service.interfaces.AsyncChapterPaymentService;
 import com.meobeo.truyen.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,8 +43,7 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
     private final StoryRepository storyRepository;
     private final SecurityUtils securityUtils;
 
-    // Store async job results in memory (trong production nên dùng Redis)
-    private final ConcurrentHashMap<String, ChapterBatchLockResponse> asyncJobResults = new ConcurrentHashMap<>();
+    private final AsyncChapterPaymentService asyncChapterPaymentService;
 
     @Override
     @Transactional
@@ -59,19 +59,12 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
         Chapter chapter = chapterRepository.findByIdWithStory(chapterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chapter với ID: " + chapterId));
 
-        // Kiểm tra chapter đã bị khóa chưa
-        boolean exists = chapterPaymentRepository.existsByChapterId(chapterId);
-        log.info("CHECK: existsByChapterId({}) = {}", chapterId, exists);
-
-        if (exists) {
-            log.error("Chapter {} đã bị khóa rồi!", chapterId);
-            throw new BadRequestException("Chapter đã bị khóa rồi");
-        }
-
+        // Sử dụng native SQL INSERT với ON CONFLICT DO NOTHING để tránh optimistic
+        // locking conflict
+        // Không cần check existsByChapterId vì ON CONFLICT sẽ handle duplicate key
         log.info("Chapter {} chưa bị khóa, tiến hành tạo record mới", chapterId);
 
-        // Tạo record khóa chapter mới bằng native query để tránh @MapsId conflict
-        int insertedRows = chapterPaymentRepository.insertChapterPayment(
+        int insertedRows = chapterPaymentRepository.insertChapterPaymentIgnoreDuplicate(
                 chapterId,
                 chapter.getStory().getId(),
                 request.getPrice(),
@@ -80,16 +73,28 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
         );
 
         if (insertedRows == 0) {
-            throw new RuntimeException("Không thể tạo payment setting cho chapter: " + chapterId);
+            log.error("Chapter {} đã bị khóa rồi hoặc không thể tạo payment setting!", chapterId);
+            throw new BadRequestException("Chapter đã bị khóa rồi");
         }
 
-        // Lấy lại entity sau khi insert để trả về response
-        ChapterPayment savedPayment = chapterPaymentRepository.findByChapterId(chapterId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy payment setting vừa tạo"));
+        log.info("Đã tạo payment setting thành công: chapterId={}", chapterId);
 
         log.info("Đã khóa chapter thành công: chapterId={}, price={}", chapterId, request.getPrice());
 
-        return mapToResponse(savedPayment);
+        // Tạo response trực tiếp thay vì lấy lại entity để tránh transaction conflict
+        ChapterPaymentResponse response = new ChapterPaymentResponse();
+        response.setChapterId(chapterId);
+        response.setStoryId(chapter.getStory().getId());
+        response.setPrice(request.getPrice());
+        response.setIsVipOnly(request.getIsVipOnly() != null ? request.getIsVipOnly() : false);
+        response.setIsLocked(true);
+        response.setChapterNumber(chapter.getChapterNumber());
+        response.setChapterTitle(chapter.getTitle());
+        response.setChapterSlug(chapter.getSlug());
+        response.setStoryTitle(chapter.getStory().getTitle());
+        response.setStorySlug(chapter.getStory().getSlug());
+
+        return response;
     }
 
     @Override
@@ -155,8 +160,33 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<ChapterPaymentResponse> getChapterPaymentsByStory(Long storyId, Long userId, Pageable pageable) {
+        log.info("Lấy danh sách payment của story (có phân trang): storyId={}, userId={}, page={}, size={}",
+                storyId, userId, pageable.getPageNumber(), pageable.getPageSize());
+
+        // Kiểm tra quyền trước khi cho phép xem danh sách payments
+        if (!canManageStory(storyId, userId)) {
+            throw new ForbiddenException("Bạn không có quyền xem thông tin payment của story này");
+        }
+
+        Page<ChapterPayment> paymentsPage = chapterPaymentRepository.findByStoryIdOrderByChapterNumber(storyId,
+                pageable);
+
+        // Map kết quả với thông tin chapter và story đầy đủ
+        Page<ChapterPaymentResponse> responsePage = paymentsPage.map(payment -> {
+            // Lấy thông tin chapter và story đầy đủ
+            ChapterPayment fullPayment = chapterPaymentRepository.findByChapterIdWithDetails(payment.getChapterId())
+                    .orElse(payment);
+            return mapToResponse(fullPayment);
+        });
+
+        return responsePage;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ChapterPaymentResponse> getChapterPaymentsByStory(Long storyId, Long userId) {
-        log.info("Lấy danh sách payment của story: storyId={}, userId={}", storyId, userId);
+        log.info("Lấy danh sách payment của story (không phân trang): storyId={}, userId={}", storyId, userId);
 
         // Kiểm tra quyền trước khi cho phép xem danh sách payments
         if (!canManageStory(storyId, userId)) {
@@ -287,7 +317,7 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
                 .stream().collect(Collectors.toSet());
 
         List<ChapterPaymentResponse> successfulLocks = new ArrayList<>();
-        List<ChapterBatchLockResponse.ChapterLockFailure> failures = new ArrayList<>();
+        List<String> failureReasons = new ArrayList<>();
 
         for (Chapter chapter : chaptersToLock) {
             try {
@@ -298,50 +328,63 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
                     continue;
                 }
 
-                // Tạo record khóa chapter
-                int insertedRows = chapterPaymentRepository.insertChapterPayment(
-                        chapter.getId(),
-                        story.getId(),
-                        request.getPrice(),
-                        request.getIsVipOnly() != null ? request.getIsVipOnly() : false,
-                        true);
+                // Tạo record khóa chapter bằng entity
+                try {
+                    ChapterPayment payment = new ChapterPayment();
+                    payment.setChapterId(chapter.getId());
+                    payment.setStoryId(story.getId());
+                    payment.setPrice(request.getPrice());
+                    payment.setIsVipOnly(request.getIsVipOnly() != null ? request.getIsVipOnly() : false);
+                    payment.setIsLocked(true);
 
-                if (insertedRows > 0) {
-                    // Lấy lại entity sau khi insert bằng method có sẵn
-                    ChapterPayment savedPayment = chapterPaymentRepository.findByChapterIdWithDetails(chapter.getId())
-                            .orElseThrow(() -> new BadRequestException("Không thể lấy thông tin payment sau khi tạo"));
-
+                    ChapterPayment savedPayment = chapterPaymentRepository.save(payment);
                     successfulLocks.add(mapToResponse(savedPayment));
                     log.info("Đã khóa chapter thành công: chapterId={}, chapterNumber={}",
                             chapter.getId(), chapter.getChapterNumber());
-                } else {
-                    failures.add(new ChapterBatchLockResponse.ChapterLockFailure(
-                            chapter.getId(), chapter.getChapterNumber(), chapter.getTitle(),
-                            "Không thể tạo payment setting"));
+                } catch (Exception e) {
+                    log.error("Lỗi khi tạo payment setting cho chapter {}: {}", chapter.getId(), e.getMessage());
+                    failureReasons.add("Lỗi tạo payment setting: " + e.getMessage());
                 }
 
             } catch (Exception e) {
                 log.error("Lỗi khi khóa chapter {}: {}", chapter.getId(), e.getMessage());
-                failures.add(new ChapterBatchLockResponse.ChapterLockFailure(
-                        chapter.getId(), chapter.getChapterNumber(), chapter.getTitle(),
-                        "Lỗi hệ thống: " + e.getMessage()));
+                failureReasons.add("Lỗi hệ thống: " + e.getMessage());
             }
         }
 
-        // Tạo response
+        // Tạo response với format mới
         ChapterBatchLockResponse response = new ChapterBatchLockResponse();
         response.setStoryId(story.getId());
         response.setStoryTitle(story.getTitle());
         response.setStorySlug(story.getSlug());
+
+        // Thống kê tổng quan
+        response.setTotalChaptersRequested(chaptersToLock.size());
         response.setTotalChaptersProcessed(chaptersToLock.size());
         response.setSuccessCount(successfulLocks.size());
-        response.setFailureCount(failures.size());
-        response.setSuccessfulLocks(successfulLocks);
-        response.setFailures(failures);
+        response.setFailureCount(failureReasons.size());
+        response.setSkippedCount(0);
+
+        // Tính tiến độ
+        response.calculateProgress();
+
+        // Thu thập lỗi chính xác (không trùng lặp)
+        if (!failureReasons.isEmpty()) {
+            Set<String> uniqueErrors = new HashSet<>(failureReasons);
+            for (String error : uniqueErrors) {
+                response.addErrorMessage(error);
+            }
+
+            // Lấy lỗi chính (lỗi xuất hiện nhiều nhất)
+            String mainError = uniqueErrors.stream()
+                    .max(Comparator.comparing(error -> failureReasons.stream().filter(e -> e.equals(error)).count()))
+                    .orElse("Không thể tạo payment setting");
+            response.setMainError(mainError);
+        }
 
         log.info("Hoàn thành khóa batch chapter: total={}, success={}, failure={}, skipped={}",
-                chaptersToLock.size(), successfulLocks.size(), failures.size(),
-                chaptersToLock.size() - successfulLocks.size() - failures.size());
+                chaptersToLock.size(), successfulLocks.size(), failureReasons.size(),
+                chaptersToLock.size() - successfulLocks.size() - failureReasons.size());
 
         return response;
     }
@@ -357,158 +400,21 @@ public class ChapterPaymentServiceImpl implements ChapterPaymentService {
             if (rangeSize < 50) {
                 throw new BadRequestException("Async chỉ dành cho range >= 50 chapter");
             }
-            if (rangeSize > 1000) {
-                throw new BadRequestException("Không thể khóa quá 1000 chapter cùng lúc");
-            }
         }
 
-        // Tạo initial response
-        ChapterBatchLockResponse initialResponse = new ChapterBatchLockResponse();
-        initialResponse.setJobId(jobId);
-        initialResponse.setStatus("PROCESSING");
-        initialResponse.setStartTime(LocalDateTime.now());
-        asyncJobResults.put(jobId, initialResponse);
+        // Khởi tạo job tracking trong async service
+        asyncChapterPaymentService.initializeJob(jobId, userId);
 
-        // Bắt đầu xử lý async
-        lockChaptersBatchAsync(request, userId, jobId);
+        // Gọi async service để xử lý bất đồng bộ
+        asyncChapterPaymentService.processBatchLockAsyncInternal(request, userId, jobId);
 
+        log.info("Đã trả về jobId ngay lập tức: {}", jobId);
         return jobId;
-    }
-
-    @Async("taskExecutor")
-    private void lockChaptersBatchAsync(ChapterBatchLockRequest request, Long userId, String jobId) {
-        log.info("Bắt đầu async batch lock: jobId={}, storyId={}, userId={}", jobId, request.getStoryId(), userId);
-
-        try {
-            // Xử lý async với chunks để tránh transaction quá lớn
-            ChapterBatchLockResponse response = processLargeBatchInChunks(request, userId, jobId);
-
-            // Lưu kết quả cuối cùng
-            response.setJobId(jobId);
-            response.setStatus("COMPLETED");
-            response.setEndTime(LocalDateTime.now());
-            asyncJobResults.put(jobId, response);
-
-            log.info("Hoàn thành async batch lock: jobId={}, success={}, failure={}",
-                    jobId, response.getSuccessCount(), response.getFailureCount());
-
-        } catch (Exception e) {
-            log.error("Lỗi async batch lock: jobId={}", jobId, e);
-
-            ChapterBatchLockResponse errorResponse = new ChapterBatchLockResponse();
-            errorResponse.setJobId(jobId);
-            errorResponse.setStatus("FAILED");
-            errorResponse.setEndTime(LocalDateTime.now());
-            errorResponse.setFailureCount(1);
-            errorResponse.setSuccessCount(0);
-
-            asyncJobResults.put(jobId, errorResponse);
-        }
     }
 
     @Override
     public Optional<ChapterBatchLockResponse> getAsyncJobStatus(String jobId) {
-        return Optional.ofNullable(asyncJobResults.get(jobId));
-    }
-
-    /**
-     * Xử lý batch lớn bằng cách chia thành chunks nhỏ
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    private ChapterBatchLockResponse processLargeBatchInChunks(ChapterBatchLockRequest request, Long userId,
-            String jobId) {
-        final int CHUNK_SIZE = 50; // Xử lý 50 chapter mỗi lần
-
-        // Tạo initial response để lưu progress
-        ChapterBatchLockResponse initialResponse = new ChapterBatchLockResponse();
-        initialResponse.setJobId(jobId);
-        initialResponse.setStatus("PROCESSING");
-        initialResponse.setStartTime(LocalDateTime.now());
-        asyncJobResults.put(jobId, initialResponse);
-
-        List<ChapterPaymentResponse> allSuccessfulLocks = new ArrayList<>();
-        List<ChapterBatchLockResponse.ChapterLockFailure> allFailures = new ArrayList<>();
-
-        int start = request.getChapterStart();
-        int end = request.getChapterEnd();
-        int totalChapters = end - start + 1;
-
-        // Lấy story info
-        Story story = storyRepository.findById(request.getStoryId())
-                .orElseThrow(
-                        () -> new ResourceNotFoundException("Không tìm thấy story với ID: " + request.getStoryId()));
-
-        // Xử lý từng chunk
-        for (int chunkStart = start; chunkStart <= end; chunkStart += CHUNK_SIZE) {
-            int chunkEnd = Math.min(chunkStart + CHUNK_SIZE - 1, end);
-
-            try {
-                // Tạo request cho chunk này
-                ChapterBatchLockRequest chunkRequest = new ChapterBatchLockRequest();
-                chunkRequest.setStoryId(request.getStoryId());
-                chunkRequest.setChapterStart(chunkStart);
-                chunkRequest.setChapterEnd(chunkEnd);
-                chunkRequest.setPrice(request.getPrice());
-                chunkRequest.setIsVipOnly(request.getIsVipOnly());
-
-                // Xử lý chunk với transaction riêng
-                ChapterBatchLockResponse chunkResponse = processChunkSeparately(chunkRequest, userId);
-
-                // Tổng hợp kết quả
-                allSuccessfulLocks.addAll(chunkResponse.getSuccessfulLocks());
-                allFailures.addAll(chunkResponse.getFailures());
-
-                int processed = chunkEnd - start + 1;
-                log.info("Hoàn thành chunk {}-{}: jobId={}, progress={}/{}",
-                        chunkStart, chunkEnd, jobId, processed, totalChapters);
-
-                // Update progress trong map
-                ChapterBatchLockResponse progressResponse = new ChapterBatchLockResponse();
-                progressResponse.setJobId(jobId);
-                progressResponse.setStatus("PROCESSING");
-                progressResponse.setStartTime(initialResponse.getStartTime());
-                progressResponse.setStoryId(story.getId());
-                progressResponse.setStoryTitle(story.getTitle());
-                progressResponse.setStorySlug(story.getSlug());
-                progressResponse.setTotalChaptersProcessed(processed);
-                progressResponse.setSuccessCount(allSuccessfulLocks.size());
-                progressResponse.setFailureCount(allFailures.size());
-
-                asyncJobResults.put(jobId, progressResponse);
-
-            } catch (Exception e) {
-                log.error("Lỗi xử lý chunk {}-{}: jobId={}", chunkStart, chunkEnd, jobId, e);
-
-                // Thêm failure cho toàn bộ chunk
-                for (int i = chunkStart; i <= chunkEnd; i++) {
-                    allFailures.add(new ChapterBatchLockResponse.ChapterLockFailure(
-                            null, i, "Chapter " + i, "Lỗi chunk: " + e.getMessage()));
-                }
-            }
-        }
-
-        // Tạo response cuối cùng
-        ChapterBatchLockResponse finalResponse = new ChapterBatchLockResponse();
-        finalResponse.setJobId(jobId);
-        finalResponse.setStoryId(story.getId());
-        finalResponse.setStoryTitle(story.getTitle());
-        finalResponse.setStorySlug(story.getSlug());
-        finalResponse.setTotalChaptersProcessed(totalChapters);
-        finalResponse.setSuccessCount(allSuccessfulLocks.size());
-        finalResponse.setFailureCount(allFailures.size());
-        finalResponse.setSuccessfulLocks(allSuccessfulLocks);
-        finalResponse.setFailures(allFailures);
-        finalResponse.setStartTime(initialResponse.getStartTime());
-
-        return finalResponse;
-    }
-
-    /**
-     * Xử lý một chunk với transaction riêng biệt
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    private ChapterBatchLockResponse processChunkSeparately(ChapterBatchLockRequest request, Long userId) {
-        return lockChaptersBatch(request, userId);
+        return asyncChapterPaymentService.getAsyncJobStatus(jobId);
     }
 
     /**

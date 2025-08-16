@@ -4,6 +4,8 @@ import com.meobeo.truyen.domain.request.chapter.ChapterBatchLockRequest;
 import com.meobeo.truyen.domain.request.chapter.ChapterLockRequest;
 import com.meobeo.truyen.domain.response.chapter.ChapterBatchLockResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterPaymentResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,7 +36,13 @@ public interface ChapterPaymentService {
     ChapterPaymentResponse getChapterPaymentInfo(Long chapterId);
 
     /**
-     * Lấy danh sách chapter payments của story
+     * Lấy danh sách chapter payments của story (có phân trang)
+     * Chỉ ADMIN hoặc author của story mới được xem
+     */
+    Page<ChapterPaymentResponse> getChapterPaymentsByStory(Long storyId, Long userId, Pageable pageable);
+
+    /**
+     * Lấy danh sách chapter payments của story (không phân trang - deprecated)
      * Chỉ ADMIN hoặc author của story mới được xem
      */
     List<ChapterPaymentResponse> getChapterPaymentsByStory(Long storyId, Long userId);

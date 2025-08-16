@@ -1,9 +1,12 @@
 package com.meobeo.truyen.mapper;
 
 import com.meobeo.truyen.domain.entity.Chapter;
+import com.meobeo.truyen.domain.entity.ChapterPayment;
 import com.meobeo.truyen.domain.response.chapter.ChapterResponse;
 import com.meobeo.truyen.domain.response.chapter.ChapterSummaryDto;
+import com.meobeo.truyen.repository.ChapterPaymentRepository;
 import com.meobeo.truyen.repository.ChapterRepository;
+import com.meobeo.truyen.domain.repository.ChapterUnlockRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChapterMapper {
 
     private final ChapterRepository chapterRepository;
+    private final ChapterPaymentRepository chapterPaymentRepository;
+    private final ChapterUnlockRepository chapterUnlockRepository;
 
     @Transactional(readOnly = true)
     public ChapterResponse toChapterResponse(Chapter chapter) {
@@ -40,10 +45,21 @@ public class ChapterMapper {
         // Navigation - lấy chapter trước và sau (chỉ khi cần thiết)
         // setNavigationInfo(response, chapter);
 
-        // Thông tin trạng thái - TODO: implement logic kiểm tra locked/purchased
-        response.setIsLocked(false);
-        response.setIsPurchased(true);
+        // Thông tin trạng thái và payment
+        setChapterStatusInfo(response, chapter, null);
 
+        return response;
+    }
+
+    /**
+     * Convert Chapter entity thành ChapterResponse với thông tin user cụ thể
+     */
+    @Transactional(readOnly = true)
+    public ChapterResponse toChapterResponse(Chapter chapter, Long userId) {
+        ChapterResponse response = toChapterResponse(chapter);
+        if (response != null && chapter != null) {
+            setChapterStatusInfo(response, chapter, userId);
+        }
         return response;
     }
 
@@ -63,9 +79,8 @@ public class ChapterMapper {
         summary.setTitle(chapter.getTitle());
         summary.setCreatedAt(chapter.getCreatedAt());
 
-        // Thông tin trạng thái - TODO: implement logic kiểm tra locked/purchased
-        summary.setIsLocked(false);
-        summary.setIsPurchased(true);
+        // Thông tin trạng thái và payment
+        setChapterStatusInfo(summary, chapter, null);
 
         return summary;
     }
@@ -80,6 +95,58 @@ public class ChapterMapper {
             setNavigationInfo(response, chapter);
         }
         return response;
+    }
+
+    /**
+     * Set thông tin trạng thái khóa/mở khóa cho ChapterResponse
+     */
+    private void setChapterStatusInfo(ChapterResponse response, Chapter chapter, Long userId) {
+        // Lấy thông tin payment
+        ChapterPayment payment = chapterPaymentRepository.findById(chapter.getId()).orElse(null);
+
+        if (payment != null) {
+            response.setIsLocked(Boolean.TRUE.equals(payment.getIsLocked()));
+            response.setIsVipOnly(Boolean.TRUE.equals(payment.getIsVipOnly()));
+            response.setUnlockPrice(payment.getPrice());
+
+            // Kiểm tra user đã mở khóa chưa
+            if (userId != null) {
+                boolean isUnlockedByUser = chapterUnlockRepository.existsByUserIdAndChapterId(userId, chapter.getId());
+                response.setIsUnlockedByUser(isUnlockedByUser);
+            } else {
+                response.setIsUnlockedByUser(false);
+            }
+        } else {
+            response.setIsLocked(false);
+            response.setIsVipOnly(false);
+            response.setUnlockPrice(0);
+            response.setIsUnlockedByUser(false);
+        }
+    }
+
+    /**
+     * Set thông tin trạng thái khóa/mở khóa cho ChapterSummaryDto
+     */
+    private void setChapterStatusInfo(ChapterSummaryDto summary, Chapter chapter, Long userId) {
+        // Lấy thông tin payment
+        ChapterPayment payment = chapterPaymentRepository.findById(chapter.getId()).orElse(null);
+
+        if (payment != null) {
+            summary.setIsLocked(Boolean.TRUE.equals(payment.getIsLocked()));
+            summary.setUnlockPrice(payment.getPrice());
+
+            // Kiểm tra user đã mở khóa chưa
+            if (userId != null) {
+                boolean isUnlockedByUser = chapterUnlockRepository.existsByUserIdAndChapterId(userId, chapter.getId());
+                summary.setIsUnlockedByUser(isUnlockedByUser);
+            } else {
+                summary.setIsUnlockedByUser(false);
+            }
+        } else {
+            summary.setIsLocked(false);
+            summary.setUnlockPrice(0);
+            summary.setIsUnlockedByUser(false);
+        }
     }
 
     private void setNavigationInfo(ChapterResponse response, Chapter chapter) {
