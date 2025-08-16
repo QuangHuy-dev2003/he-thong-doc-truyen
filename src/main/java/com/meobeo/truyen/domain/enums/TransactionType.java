@@ -6,5 +6,6 @@ public enum TransactionType {
     GIFT_CODE, // Nhận linh thạch từ gift code
     SPIRIT_EARN, // Kiếm linh thạch (đọc truyện, hoạt động)
     SPIRIT_SPEND, // Tiêu linh thạch (mua chapter)
-    SPIRIT_EXCHANGE // Đổi linh thạch (VND -> Linh thạch)
+    SPIRIT_EXCHANGE, // Đổi linh thạch (VND -> Linh thạch)
+    ADMIN_ADJUSTMENT // Điều chỉnh bởi ADMIN
 }
