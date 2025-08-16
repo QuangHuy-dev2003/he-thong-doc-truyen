@@ -116,4 +116,61 @@ public interface ChapterPaymentRepository extends JpaRepository<ChapterPayment, 
                         @Param("price") Integer price,
                         @Param("isVipOnly") Boolean isVipOnly,
                         @Param("isLocked") Boolean isLocked);
+
+        /**
+         * Lấy danh sách chapter bị khóa theo story với phân trang
+         * Tối ưu cho việc check unlock full story
+         */
+        @Query(value = "SELECT cp.chapter_id, cp.price, c.chapter_number, c.title " +
+                        "FROM chapter_payments cp " +
+                        "INNER JOIN chapters c ON cp.chapter_id = c.id " +
+                        "WHERE cp.story_id = :storyId AND cp.is_locked = true " +
+                        "ORDER BY c.chapter_number ASC " +
+                        "LIMIT :limit OFFSET :offset", nativeQuery = true)
+        List<Object[]> findLockedChaptersByStoryWithPagination(
+                        @Param("storyId") Long storyId,
+                        @Param("limit") int limit,
+                        @Param("offset") int offset);
+
+        /**
+         * Lấy danh sách chapter đã unlock của user trong story
+         * Tối ưu cho việc check trạng thái unlock
+         */
+        @Query("SELECT cu.chapter.id FROM ChapterUnlock cu " +
+                        "WHERE cu.user.id = :userId AND cu.chapter.story.id = :storyId")
+        List<Long> findUnlockedChapterIdsByUserAndStory(@Param("userId") Long userId, @Param("storyId") Long storyId);
+
+        /**
+         * Lấy danh sách chapter cần unlock (bị khóa và chưa unlock)
+         * Tối ưu query với JOIN để tránh N+1
+         */
+        @Query(value = "SELECT cp.chapter_id, cp.price, c.chapter_number, c.title " +
+                        "FROM chapter_payments cp " +
+                        "INNER JOIN chapters c ON cp.chapter_id = c.id " +
+                        "WHERE cp.story_id = :storyId " +
+                        "AND cp.is_locked = true " +
+                        "AND cp.chapter_id NOT IN (" +
+                        "    SELECT cu.chapter_id FROM chapter_unlocks cu " +
+                        "    WHERE cu.user_id = :userId" +
+                        ") " +
+                        "ORDER BY c.chapter_number ASC " +
+                        "LIMIT :limit OFFSET :offset", nativeQuery = true)
+        List<Object[]> findChaptersToUnlockByStory(
+                        @Param("storyId") Long storyId,
+                        @Param("userId") Long userId,
+                        @Param("limit") int limit,
+                        @Param("offset") int offset);
+
+        /**
+         * Đếm số chapter cần unlock (bị khóa và chưa unlock)
+         */
+        @Query(value = "SELECT COUNT(cp.chapter_id) " +
+                        "FROM chapter_payments cp " +
+                        "WHERE cp.story_id = :storyId " +
+                        "AND cp.is_locked = true " +
+                        "AND cp.chapter_id NOT IN (" +
+                        "    SELECT cu.chapter_id FROM chapter_unlocks cu " +
+                        "    WHERE cu.user_id = :userId" +
+                        ")", nativeQuery = true)
+        Long countChaptersToUnlockByStory(@Param("storyId") Long storyId, @Param("userId") Long userId);
 }

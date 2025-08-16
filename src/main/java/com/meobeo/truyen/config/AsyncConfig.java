@@ -51,4 +51,20 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "chapterUnlockExecutor")
+    public Executor chapterUnlockExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        // Thread pool riêng cho chapter unlock với ít thread hơn vì không cần xử lý
+        // file
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("ChapterUnlock-");
+        // Cho phép thread cũ bị terminate để tạo thread mới
+        executor.setAllowCoreThreadTimeOut(true);
+        executor.setKeepAliveSeconds(300);
+        executor.initialize();
+        return executor;
+    }
 }

@@ -1,6 +1,5 @@
 package com.meobeo.truyen.controller.chapter;
 
-import com.meobeo.truyen.domain.request.chapter.UnlockChapterRequest;
 import com.meobeo.truyen.domain.request.chapter.UnlockChapterRangeRequest;
 import com.meobeo.truyen.domain.request.chapter.UnlockFullStoryRequest;
 import com.meobeo.truyen.domain.response.chapter.ChapterLockStatusResponse;
@@ -9,6 +8,7 @@ import com.meobeo.truyen.domain.response.chapter.UnlockChapterResponse;
 import com.meobeo.truyen.domain.response.chapter.UnlockFullStoryResponse;
 import com.meobeo.truyen.domain.response.chapter.UnlockedChaptersResponse;
 import com.meobeo.truyen.mapper.ChapterUnlockMapper;
+import com.meobeo.truyen.security.CustomUserDetails;
 import com.meobeo.truyen.service.interfaces.ChapterUnlockService;
 import com.meobeo.truyen.utils.ApiResponse;
 import jakarta.validation.Valid;
@@ -32,21 +32,34 @@ public class UserChapterUnlockController {
     private final ChapterUnlockMapper chapterUnlockMapper;
 
     /**
+     * Helper method để lấy userId từ authentication
+     */
+    private Long getUserIdFromAuthentication(Authentication authentication) {
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        return userDetails.getUserId();
+    }
+
+    /**
+     * Helper method để lấy user details từ authentication
+     */
+    private CustomUserDetails getUserDetailsFromAuthentication(Authentication authentication) {
+        return (CustomUserDetails) authentication.getPrincipal();
+    }
+
+    /**
      * Mở khóa 1 chương
      */
     @PostMapping("/chapters/{chapterId}/unlock")
     public ResponseEntity<ApiResponse<UnlockChapterResponse>> unlockChapter(
             @PathVariable Long chapterId,
-            @Valid @RequestBody UnlockChapterRequest request,
             Authentication authentication) {
 
-        log.info("User {} yêu cầu mở khóa chương {}", authentication.getName(), chapterId);
+        CustomUserDetails userDetails = getUserDetailsFromAuthentication(authentication);
+        Long userId = userDetails.getUserId();
 
-        // Đảm bảo chapterId trong path và request giống nhau
-        request.setChapterId(chapterId);
+        log.info("User {} yêu cầu mở khóa chương {}", userDetails.getDisplayName(), chapterId);
 
-        Long userId = Long.parseLong(authentication.getName());
-        UnlockChapterResponse response = chapterUnlockService.unlockChapter(request, userId);
+        UnlockChapterResponse response = chapterUnlockService.unlockChapter(chapterId, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Mở khóa chương thành công", response));
     }
@@ -60,16 +73,52 @@ public class UserChapterUnlockController {
             @Valid @RequestBody UnlockChapterRangeRequest request,
             Authentication authentication) {
 
+        CustomUserDetails userDetails = getUserDetailsFromAuthentication(authentication);
+        Long userId = userDetails.getUserId();
+
         log.info("User {} yêu cầu mở khóa chương từ {} đến {} cho story {}",
-                authentication.getName(), request.getFromChapterNumber(), request.getToChapterNumber(), storyId);
+                userDetails.getDisplayName(), request.getFromChapterNumber(), request.getToChapterNumber(), storyId);
 
-        // Đảm bảo storyId trong path và request giống nhau
-        request.setStoryId(storyId);
+        // Kiểm tra số lượng chapter để quyết định sync hay async
+        int rangeSize = request.getToChapterNumber() - request.getFromChapterNumber() + 1;
 
-        Long userId = Long.parseLong(authentication.getName());
-        UnlockChapterBatchResponse response = chapterUnlockService.unlockChapterRange(request, userId);
+        if (rangeSize >= 20) {
+            // Sử dụng async cho range lớn
+            String jobId = chapterUnlockService.startAsyncUnlockRange(storyId, request, userId);
 
-        return ResponseEntity.ok(ApiResponse.success("Mở khóa chương thành công", response));
+            UnlockChapterBatchResponse response = new UnlockChapterBatchResponse();
+            response.setJobId(jobId);
+            response.setStatus("PENDING");
+            response.setMessage("Đã nhận yêu cầu mở khóa. Đang xử lý bất đồng bộ...");
+
+            return ResponseEntity.ok(ApiResponse.success("Đã bắt đầu mở khóa chương bất đồng bộ", response));
+        } else {
+            // Sử dụng sync cho range nhỏ
+            UnlockChapterBatchResponse response = chapterUnlockService.unlockChapterRange(storyId, request, userId);
+            return ResponseEntity.ok(ApiResponse.success("Mở khóa chương thành công", response));
+        }
+    }
+
+    /**
+     * Check trạng thái unlock full truyện trước khi mở khóa
+     */
+    @GetMapping("/stories/{storyId}/unlock-full/check")
+    public ResponseEntity<ApiResponse<UnlockFullStoryResponse>> checkUnlockFullStoryStatus(
+            @PathVariable Long storyId,
+            Authentication authentication) {
+
+        CustomUserDetails userDetails = getUserDetailsFromAuthentication(authentication);
+        Long userId = userDetails.getUserId();
+
+        log.info("User {} check trạng thái unlock full truyện {}", userDetails.getDisplayName(), storyId);
+
+        // Tạo empty request object
+        UnlockFullStoryRequest request = new UnlockFullStoryRequest();
+
+        // Check trạng thái unlock
+        UnlockFullStoryResponse response = chapterUnlockService.checkUnlockFullStoryStatus(storyId, userId);
+
+        return ResponseEntity.ok(ApiResponse.success("Check trạng thái unlock full truyện thành công", response));
     }
 
     /**
@@ -78,18 +127,25 @@ public class UserChapterUnlockController {
     @PostMapping("/stories/{storyId}/unlock-full")
     public ResponseEntity<ApiResponse<UnlockFullStoryResponse>> unlockFullStory(
             @PathVariable Long storyId,
-            @Valid @RequestBody UnlockFullStoryRequest request,
             Authentication authentication) {
 
-        log.info("User {} yêu cầu mở khóa full truyện {}", authentication.getName(), storyId);
+        CustomUserDetails userDetails = getUserDetailsFromAuthentication(authentication);
+        Long userId = userDetails.getUserId();
 
-        // Đảm bảo storyId trong path và request giống nhau
-        request.setStoryId(storyId);
+        log.info("User {} yêu cầu mở khóa full truyện {}", userDetails.getDisplayName(), storyId);
 
-        Long userId = Long.parseLong(authentication.getName());
-        UnlockFullStoryResponse response = chapterUnlockService.unlockFullStory(request, userId);
+        // Tạo empty request object
+        UnlockFullStoryRequest request = new UnlockFullStoryRequest();
 
-        return ResponseEntity.ok(ApiResponse.success("Mở khóa full truyện thành công", response));
+        // Luôn sử dụng async cho unlock full story vì thường có nhiều chapter
+        String jobId = chapterUnlockService.startAsyncUnlockFullStory(storyId, request, userId);
+
+        UnlockFullStoryResponse response = new UnlockFullStoryResponse();
+        response.setJobId(jobId);
+        response.setStatus("PENDING");
+        response.setMessage("Đã nhận yêu cầu mở khóa full truyện. Đang xử lý bất đồng bộ...");
+
+        return ResponseEntity.ok(ApiResponse.success("Đã bắt đầu mở khóa full truyện bất đồng bộ", response));
     }
 
     /**
@@ -100,7 +156,7 @@ public class UserChapterUnlockController {
             @PathVariable Long chapterId,
             Authentication authentication) {
 
-        Long userId = Long.parseLong(authentication.getName());
+        Long userId = getUserIdFromAuthentication(authentication);
         ChapterLockStatusResponse response = chapterUnlockMapper.toChapterLockStatusResponse(chapterId, userId);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy trạng thái khóa chương thành công", response));
@@ -116,7 +172,7 @@ public class UserChapterUnlockController {
             @RequestParam(defaultValue = "20") int size,
             Authentication authentication) {
 
-        Long userId = Long.parseLong(authentication.getName());
+        Long userId = getUserIdFromAuthentication(authentication);
 
         // Tạo Pageable
         Pageable pageable = PageRequest.of(page, size);
@@ -129,5 +185,81 @@ public class UserChapterUnlockController {
                 unlockedChaptersPage, storyId, "Story Title");
 
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách chương đã mở khóa thành công", response));
+    }
+
+    /**
+     * Kiểm tra trạng thái job unlock range
+     */
+    @GetMapping("/unlock-range/{jobId}/status")
+    public ResponseEntity<ApiResponse<UnlockChapterBatchResponse>> getUnlockRangeStatus(
+            @PathVariable String jobId,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuthentication(authentication);
+
+        var status = chapterUnlockService.getAsyncUnlockRangeStatus(jobId);
+
+        if (status.isPresent()) {
+            return ResponseEntity.ok(ApiResponse.success("Lấy trạng thái job thành công", status.get()));
+        } else {
+            return ResponseEntity.ok(ApiResponse.error("Không tìm thấy job với ID: " + jobId));
+        }
+    }
+
+    /**
+     * Kiểm tra trạng thái job unlock full story
+     */
+    @GetMapping("/unlock-full-story/{jobId}/status")
+    public ResponseEntity<ApiResponse<UnlockFullStoryResponse>> getUnlockFullStoryStatus(
+            @PathVariable String jobId,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuthentication(authentication);
+
+        var status = chapterUnlockService.getAsyncUnlockFullStoryStatus(jobId);
+
+        if (status.isPresent()) {
+            return ResponseEntity.ok(ApiResponse.success("Lấy trạng thái job thành công", status.get()));
+        } else {
+            return ResponseEntity.ok(ApiResponse.error("Không tìm thấy job với ID: " + jobId));
+        }
+    }
+
+    /**
+     * Hủy job unlock range
+     */
+    @DeleteMapping("/unlock-range/{jobId}")
+    public ResponseEntity<ApiResponse<String>> cancelUnlockRange(
+            @PathVariable String jobId,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuthentication(authentication);
+
+        boolean cancelled = chapterUnlockService.cancelAsyncUnlockRange(jobId, userId);
+
+        if (cancelled) {
+            return ResponseEntity.ok(ApiResponse.success("Đã hủy job unlock range thành công", "Job đã được hủy"));
+        } else {
+            return ResponseEntity.ok(ApiResponse.error("Không thể hủy job hoặc job không tồn tại"));
+        }
+    }
+
+    /**
+     * Hủy job unlock full story
+     */
+    @DeleteMapping("/unlock-full-story/{jobId}")
+    public ResponseEntity<ApiResponse<String>> cancelUnlockFullStory(
+            @PathVariable String jobId,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuthentication(authentication);
+
+        boolean cancelled = chapterUnlockService.cancelAsyncUnlockFullStory(jobId, userId);
+
+        if (cancelled) {
+            return ResponseEntity.ok(ApiResponse.success("Đã hủy job unlock full story thành công", "Job đã được hủy"));
+        } else {
+            return ResponseEntity.ok(ApiResponse.error("Không thể hủy job hoặc job không tồn tại"));
+        }
     }
 }
